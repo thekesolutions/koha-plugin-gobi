@@ -1,0 +1,47 @@
+[% INCLUDE 'doc-head-open.inc' %]
+ <title>Koha: GOBI acq integration tool</title>
+[% INCLUDE 'doc-head-close.inc' %]
+</head>
+<body>
+[% INCLUDE 'header.inc' %]
+[% INCLUDE 'cat-search.inc' %]
+
+<div id="breadcrumbs">
+    <a href="/cgi-bin/koha/mainpage.pl">Home</a> &rsaquo;
+    <a href="/cgi-bin/koha/mainpage.pl">Tools</a> &rsaquo;
+    <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a> &rsaquo;
+    <a href="?class=[% CLASS %]&method=[% METHOD %]">GOBI</a>
+</div>
+
+<div id="doc3">
+    <h3>GOBI acquisitions</h3>
+
+[% IF ( error or not gobi_order ) %]
+    <div class="dialog alert">
+        <h3>ERROR</h3>
+        <p>There was a problem processing your request.</p>
+    </div>
+
+	<form method="get">
+        <input type="hidden" name="class"  value="[% CLASS %]"/>
+        <input type="hidden" name="method" value="[% METHOD %]"/>
+        <input type="hidden" name="step"   value="process"/>
+        <p>
+            <label for="barcode">Paste your GOBI PO here: </label>
+            <input type="text" name="purchase-order-xml"/>
+        </p>
+
+		<p><input type="submit" value="Submit" /></p>
+	</form>
+[% ELSE %]
+    <h3>GOBI Order added ([% gpo_id %])</h3>
+    <ul>
+        <li>ItemPONumber: [% gobi_order.OrderDetail.ItemPONumber %]</li>
+        <li>Location: [% gobi_order.OrderDetail.Location %]</li>
+        <li>Quantity: [% gobi_order.OrderDetail.Quantity %]</li>
+        <li>YBPOrderKey: [% gobi_order.OrderDetail.YBPOrderKey %]</li>
+        <li><a href="?class=[% CLASS %]&method=[% METHOD %]&step=process_marc&gobi_order_id=[% gpo_id %]">Process MARC</a></li>
+    </ul>
+[% END %]
+
+[% INCLUDE 'intranet-bottom.inc' %]

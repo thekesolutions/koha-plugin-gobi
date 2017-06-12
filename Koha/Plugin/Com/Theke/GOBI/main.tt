@@ -1,0 +1,61 @@
+[% INCLUDE 'doc-head-open.inc' %]
+ <title>Koha: GOBI acq integration tool</title>
+[% INCLUDE 'doc-head-close.inc' %]
+</head>
+<body>
+[% INCLUDE 'header.inc' %]
+[% INCLUDE 'cat-search.inc' %]
+
+<div id="breadcrumbs">
+    <a href="/cgi-bin/koha/mainpage.pl">Home</a> &rsaquo;
+    <a href="/cgi-bin/koha/mainpage.pl">Tools</a> &rsaquo;
+    <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a> &rsaquo;
+    <a href="?class=[% CLASS %]&method=[% METHOD %]">GOBI</a>
+</div>
+
+<div id="doc3">
+    <h3>GOBI acquisitions</h3>
+
+    [% IF ( error ) %]
+    <div class="dialog alert">
+        <h3>ERROR</h3>
+        <p>There was a problem processing your request.</p>
+    </div>
+    [% END %]
+
+	<form method="post">
+        <input type="hidden" name="class"  value="[% CLASS %]"/>
+        <input type="hidden" name="method" value="[% METHOD %]"/>
+        <input type="hidden" name="step"   value="add"/>
+        <p>
+            <label for="barcode">Paste your new GOBI PO here: </label>
+            <input type="text" name="purchase-order-xml"/>
+		<input type="submit" value="Submit" /></p>
+	</form>
+
+[% IF gobi_orders.size %]
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>ItemPONumber</th>
+        <th>Status</th>
+        <th>Basket</th>
+        <th>MARC link</th>
+      </tr>
+    </thead>
+    <tbody>
+  [% FOREACH gobi_order IN gobi_orders %]
+      <tr>
+        <td><a href="?class=[% CLASS %]&method=[% METHOD %]&step=get&gobi_order_id=[% gobi_order.id %]">[% gobi_order.id %]</a></td>
+        <td>[% gobi_order.itemponumber %]</td>
+        <td>[% gobi_order.status %]</td>
+        <td>[% gobi_order.basketno %]</td>
+        <td><span class="error">TODO</span></td>
+      </tr>
+  [% END %]
+    </tbody>
+  </table>
+[% END %]
+
+[% INCLUDE 'intranet-bottom.inc' %]
