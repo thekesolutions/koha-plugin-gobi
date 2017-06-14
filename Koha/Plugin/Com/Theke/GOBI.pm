@@ -7,12 +7,17 @@ use base qw(Koha::Plugins::Base);
 
 use C4::Acquisition qw/NewBasket CloseBasket/;
 use C4::Auth;
-use C4::Biblio qw/GetMarcBiblio/;
+use C4::Biblio qw/AddBiblio GetMarcBiblio/;
+use C4::Items qw/AddItem/;
 use C4::Context;
 use C4::Matcher;
 
+use Koha::Acquisition::Booksellers;
 use Koha::Biblios;
+use Koha::Acquisition::Currencies;
 use Koha::Items;
+use Koha::Libraries;
+use Koha::Number::Price;
 
 use Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
 
@@ -29,7 +34,7 @@ our $metadata = {
     description     => 'Integrates GOBI with Koha',
     date_authored   => '2017-05-10',
     date_updated    => '2017-05-10',
-    minimum_version => '16.1200000',
+    minimum_version => '17.0500000',
     maximum_version => undef,
     version         => $VERSION,
 };
@@ -60,9 +65,6 @@ sub tool {
     elsif ( $step eq 'get' ) {
         $self->_get_order();
     }
-    elsif ( $step eq 'process_marc' ) {
-        $self->_process_marc();
-    }
     else {
         # $step eq 'render'
         $self->_list_orders();
@@ -79,32 +81,82 @@ sub _add_order {
     my $logged_user = C4::Auth::getborrowernumber();
     my $basketno;
     my $gobi_order;
-    my $gpo_id;
+    my $gobi_order_id;
+
+    my @itemnumbers;
+
+    my $schema = Koha::Database->new()->schema();
+    $schema->storage->txn_begin();
+
     try {
         # Parse the raw purchase order
         $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($purchase_order_raw);
         my $record = $gobi_order->{record};
+        my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
+
+        # Some basic checks for data health
+        my $fund_id      = $self->_check_fund_code($gobi_order);
+        my $library_code = $self->_check_library_code($gobi_order);
+        my $vendor_code  = $self->_check_vendor_code($gobi_order);
+        my $currency     = $self->_check_currency($gobi_order);
+        my $price        = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
+        my $location     = $gobi_order->OrderDetail->{Location} // q{};        # no fk
+
         # Create a basket
         $basketno = C4::Acquisition::NewBasket(
-             1,                                        # $booksellerid  TODO: Syspref? LocalData on GOBI message?
-             $logged_user,                             # $authorisedby
-             $record->title,                           # $basketname    TODO: MARC21 only?
-             "GOBI order",                             # $basketnote    TODO: Define what would be useful here
-             $gobi_order->{OrderDetail}->{OrderNotes}, # $basketbooksellernote
-             undef,                                    # $basketcontractnumber / unneeded for now
-             "CPL",                                    # $deliveryplace TODO: Should be read from the GPO
-             "CPL",                                    # $billingplace  TODO: Should be read from the GPO
-             $gobi_order->{standing}                   # $is_standing
+            $vendor_code,              # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
+            $logged_user,              # $authorisedby
+            $record->title,            # $basketname    TODO: MARC21 only?
+            "GOBI order",              # $basketnote    TODO: Define what would be useful here
+            q{},                       # $basketbooksellernote
+            undef,                     # $basketcontractnumber / unneeded for now
+            $library_code,
+            $library_code,
+            $gobi_order->{standing}    # $is_standing
         );
-        # Store on the plugin table
-        $gpo_id = $self->_store_order( $gobi_order, $basketno, $purchase_order_raw );
-        # Add biblio | TODO: Find matchings in Zebra
+
+        # Store on the plugin table TODO: Figure what we would really need
+        $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basketno, $purchase_order_raw );
+
+        # Add biblio
         my ( $biblionumber, $match ) = $self->_add_biblio_or_find_duplicate($record);
+
+        my $order_data = {
+            biblionumber               => $biblionumber,
+            basketno                   => $basketno,
+            budget_id                  => $fund_id,
+            listprice                  => $price,
+            quantity                   => $quantity,
+            quantityreceived           => 0,
+            order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
+            order_internalnote         => q{},
+            sort1                      => q{},
+            sort2                      => q{},
+            currency                   => $currency,
+            suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
+        };
+        $order_data = $self->_add_price_data( $vendor_code, $price, $quantity, $order_data );
+        my $koha_order = Koha::Acquisition::Order->new($order_data)->insert;
+
+        # Are we configured to generate items on ordering?
+        if (    C4::Context->preference('AcqCreateItem') eq 'ordering'
+             && $quantity > 0 ) {
+            for ( my $i = 0; $i < $quantity; $i++ ) {
+                my $item_data
+                    = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $library_code,
+                    $location );
+                my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
+                push @itemnumbers, $itemnumber;
+            }
+            $koha_order->add_item($_) for @itemnumbers;
+        }
 
         #C4::Acquisition::CloseBasket( $basketno );
     }
     catch {
-        if ( $_->isa('Koha::Plugin::Com::Theke::GOBI::Exception') ) {
+        # Problem found, rollback transaction, notify error
+        $schema->storage->txn_rollback();
+        if ( $_->isa('GOBI::Exception') ) {
             $template->param( error => $_->error );
         }
         else {
@@ -113,8 +165,8 @@ sub _add_order {
     };
 
     $template->param(
-        gobi_order => $gobi_order,
-        gpo_id     => $gpo_id
+        gobi_order    => $gobi_order,
+        gobi_order_id => $gobi_order_id
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -133,38 +185,6 @@ sub _get_order {
 
     try {
         $gobi_order = $self->_get_gobi_order($id);
-    }
-    catch {
-        if ( $_->isa('Koha::Plugin::Com::Theke::GOBI::Exception') ) {
-            $template->param( error => $_->error );
-        }
-        else {
-            $template->param( error => $_ );
-        }
-    };
-
-    $template->param(
-        gobi_order => $gobi_order,
-        gpo_id     => $id
-    );
-
-    print $cgi->header( -charset => 'utf-8' );
-    print $template->output();
-}
-
-sub _process_marc {
-    my ( $self, $args ) = @_;
-
-    my $cgi = $self->{cgi};
-    my $id  = $cgi->param('gobi_order_id');
-
-    my $template = $self->get_template( { file => 'order_details.tt' } );
-
-    my $gobi_order;
-
-    try {
-        $gobi_order = $self->_get_gobi_order($id);
-
     }
     catch {
         if ( $_->isa('Koha::Plugin::Com::Theke::GOBI::Exception') ) {
@@ -205,7 +225,7 @@ sub _list_orders {
     print $template->output();
 }
 
-sub _store_order {
+sub _store_gobi_order {
     my ( $self, $gobi_order, $basketno, $raw ) = @_;
 
     my $table = $self->get_qualified_table_name('purchase_orders');
@@ -220,6 +240,21 @@ sub _store_order {
     my $gpo_id = C4::Context->dbh->{'mysql_insertid'};
 
     return $gpo_id;
+}
+
+sub _update_order_status {
+    my ( $self, $gpo_id, $status ) = @_;
+
+    my $table = $self->get_qualified_table_name('purchase_orders');
+    my $sth   = C4::Context->dbh->prepare( "
+        UPDATE $table
+        SET status=?
+        WHERE id=?
+    " );
+
+    $sth->execute( $status, $gpo_id );
+
+    return $self;
 }
 
 sub _get_gobi_order {
@@ -250,10 +285,11 @@ sub _add_biblio_or_find_duplicate {
     my $isbn = $record->subfield( '020', 'a' );
     my $match;
 
-    my $biblionumber = _check_for_existing_bib( $isbn );
+    my $biblionumber = _check_for_existing_bib($isbn);
     if ( !defined $biblionumber ) {
+
         # No match, add the record
-        $biblionumber = AddBiblio($record,'');
+        ( $biblionumber, undef ) = AddBiblio( $record, '' );
         $match = 0;
     }
     else {
@@ -263,6 +299,66 @@ sub _add_biblio_or_find_duplicate {
     return ( $biblionumber, $match );
 }
 
+sub _generate_item_data {
+    my ( $self, $gobi_order, $vendor_code, $price, $library, $location ) = @_;
+
+    my $item_data = {
+        booksellerid     => $vendor_code,
+        cn_source        => C4::Context->preference('DefaultClassificationSource'),
+        cn_sort          => q{},
+        holdingbranch    => $library,
+        homebranch       => $library,
+        location         => $location,
+        notforloan       => -1,
+        price            => $price,
+        replacementprice => $price
+    };
+
+    return $item_data;
+}
+
+sub _add_price_data {
+    my ( $self, $bookseller_id, $price, $quantity, $order_data ) = @_;
+
+    my $bookseller = Koha::Acquisition::Booksellers->find($bookseller_id);
+    my $active_currency = Koha::Acquisition::Currencies->get_active;
+    # Unformat price
+    $price = Koha::Number::Price->new($price)->unformat;
+    # Get tax and discounts info from the vendor
+    my $tax_rate = $bookseller->tax_rate;
+    my $discount = $bookseller->discount / 100;
+
+    $order_data->{tax_rate} = $tax_rate;
+    $order_data->{discount} = $discount;
+
+    if ($price) {
+        if ( $bookseller->listincgst ) {
+            # Vendor includes GST
+            $order_data->{ecost} = $price * ( 1 - $discount );
+            $order_data->{rrp}   = $price;
+        } else {
+            $order_data->{rrp}   = $price / ( 1 + $order_data->{tax_rate} );
+            $order_data->{ecost} = $order_data->{rrp} * ( 1 - $discount );
+        }
+        $order_data->{listprice} = $order_data->{rrp} / $active_currency->rate;
+        $order_data->{unitprice} = $order_data->{ecost};
+        $order_data->{total}     = $order_data->{ecost} * $quantity;
+    } else {
+        $order_data->{listprice} = 0;
+    }
+
+    $order_data = C4::Acquisition::populate_order_with_prices(
+        {
+            order        => $order_data,
+            booksellerid => $bookseller_id,
+            ordering     => 1,
+            receiving    => 1,
+        }
+    );
+
+    return $order_data;
+}
+
 sub _check_for_existing_bib {
     my $isbn = shift;
 
@@ -270,20 +366,18 @@ sub _check_for_existing_bib {
     $search_isbn =~ s/^\s*/%/xms;
     $search_isbn =~ s/\s*$/%/xms;
     my $dbh = C4::Context->dbh;
-    my $sth = $dbh->prepare(
-'select biblionumber, biblioitemnumber from biblioitems where isbn like ?',
-    );
-    my $tuple_arr =
-      $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
+    my $sth
+        = $dbh->prepare( 'select biblionumber from biblioitems where isbn like ?',
+        );
+    my $tuple_arr = $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
     if ( @{$tuple_arr} ) {
         return $tuple_arr->[0];
     }
     elsif ( length($isbn) == 13 && $isbn !~ /^97[89]/ ) {
-        my $tarr = $dbh->selectall_arrayref(
-'select biblionumber, biblioitemnumber from biblioitems where ean = ?',
-            { Slice => {} },
-            $isbn
-        );
+        my $tarr
+            = $dbh->selectall_arrayref(
+            'select biblionumber from biblioitems where ean = ?',
+            { Slice => {} }, $isbn );
         if ( @{$tarr} ) {
             return $tarr->[0];
         }
@@ -307,14 +401,88 @@ sub _check_for_existing_bib {
         }
         if ($search_isbn) {
             $search_isbn = "%$search_isbn%";
-            $tuple_arr =
-              $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
+            $tuple_arr = $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
             if ( @{$tuple_arr} ) {
                 return $tuple_arr->[0];
             }
         }
     }
     return;
+}
+
+sub _check_fund_code {
+    my ( $self, $gobi_order ) = @_;
+
+    my $schema = Koha::Database->new()->schema();
+
+    # We actually call it fund
+    my $budget_code = $gobi_order->OrderDetail->{FundCode};
+
+    # Check budget is active !
+    my $period_rs = $schema->resultset('Aqbudgetperiod')->search( { budget_period_active => 1, } );
+
+    # Check the fund code exists and is active
+    my $budget = $schema->resultset('Aqbudget')->single(
+        {   budget_code      => $budget_code,
+            budget_period_id => { -in => $period_rs->get_column('budget_period_id')->as_query },
+        }
+    );
+
+    if ( !defined $budget ) {
+
+        # Raise an exception the passed fund is not valid
+        GOBI::Exception->throw("Fund code $budget_code is invalid");
+    }
+
+    return $budget->id;
+}
+
+sub _check_library_code {
+    my ( $self, $gobi_order ) = @_;
+
+    # We actually call it fund
+    my $library_code = $gobi_order->OrderDetail->{LocalData}->{Library};
+
+    if ( !defined $library_code ) {
+        GOBI::Exception->throw("Missing library code.");
+    }
+
+    GOBI::Exception->throw("Invalid library code passed ($library_code)")
+        unless Koha::Libraries->find($library_code);
+
+    return $library_code;
+}
+
+sub _check_vendor_code {
+    my ( $self, $gobi_order ) = @_;
+
+    # We actually call it fund
+    my $vendor_code = $gobi_order->OrderDetail->{LocalData}->{VendorCode};
+
+    if ( !defined $vendor_code ) {
+        GOBI::Exception->throw("Missing vendor code.");
+    }
+
+    GOBI::Exception->throw("Invalid vendor code passed ($vendor_code)")
+        unless Koha::Acquisition::Booksellers->find($vendor_code);
+
+    return $vendor_code;
+}
+
+sub _check_currency {
+    my ( $self, $gobi_order ) = @_;
+
+    # We actually call it fund
+    my $currency = $gobi_order->OrderDetail->{ListPriceCurrency};
+
+    if ( !defined $currency ) {
+        GOBI::Exception->throw("Missing currency code.");
+    }
+
+    GOBI::Exception->throw("Invalid vendor code passed ($currency)")
+        unless Koha::Acquisition::Currencies->find($currency);
+
+    return $currency;
 }
 
 sub _table_exists {
@@ -353,7 +521,5 @@ sub uninstall {
 
     return 1;
 }
-
-
 
 1;

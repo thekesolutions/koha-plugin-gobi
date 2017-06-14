@@ -37,10 +37,10 @@
       </collection>
       <OrderDetail>
         <ItemPONumber>118279</ItemPONumber>
-        <FundCode>bio</FundCode>
+        <FundCode>FUND</FundCode>
         <OrderNotes>Test Note to ybp</OrderNotes>
         <Location>BOND</Location>
-        <Quantity>1</Quantity>
+        <Quantity>3</Quantity>
         <YBPOrderKey>99962603530</YBPOrderKey>
         <OrderPlaced>2015-10-21T16:42:47</OrderPlaced>
         <Initials>KHA</Initials>
@@ -49,8 +49,8 @@
           <Currency>USD</Currency>
         </ListPrice>
         <LocalData>
-          <Description>LocalData1</Description>
-          <Value>Any Location</Value>
+          <Description>VendorCode</Description>
+          <Value>1</Value>
         </LocalData>
         <LocalData>
           <Description>LocalData2</Description>
@@ -61,8 +61,8 @@
           <Value>Test LocalData 3</Value>
         </LocalData>
         <LocalData>
-          <Description>LocalData4</Description>
-          <Value>Test Local Data 4</Value>
+          <Description>Library</Description>
+          <Value>CPL</Value>
         </LocalData>
         <PurchaseOption>
           <VendorPOCode>EBS</VendorPOCode>

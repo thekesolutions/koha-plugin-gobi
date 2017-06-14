@@ -23,15 +23,15 @@
     </div>
     [% END %]
 
-	<form method="post">
+  <form method="post">
         <input type="hidden" name="class"  value="[% CLASS %]"/>
         <input type="hidden" name="method" value="[% METHOD %]"/>
         <input type="hidden" name="step"   value="add"/>
         <p>
-            <label for="barcode">Paste your new GOBI PO here: </label>
+            <label for="purchase-order-xml">Paste your new GOBI PO here: </label>
             <input type="text" name="purchase-order-xml"/>
-		<input type="submit" value="Submit" /></p>
-	</form>
+    <input type="submit" value="Submit" /></p>
+  </form>
 
 [% IF gobi_orders.size %]
   <table class="table">

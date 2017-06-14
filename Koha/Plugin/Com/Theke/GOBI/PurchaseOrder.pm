@@ -13,6 +13,10 @@ use Exception::Class (
         isa         => 'GOBI::Exception',
         description => 'Mandatory CustomerDetail not found'
     },
+    'GOBI::Exceptions::MissingMandatoryField' => {
+        isa         => 'GOBI::Exception',
+        description => 'A mandatory field is missing on the order message'
+    },
     'GOBI::Exceptions::NoXML' => {
         isa         => 'GOBI::Exception',
         description => 'XML missing in constructor'
@@ -25,7 +29,7 @@ use Exception::Class (
 
 use base qw(Class::Accessor);
 
-__PACKAGE__->mk_accessors(qw( type record CustomerDetail OrderDetail ));
+__PACKAGE__->mk_accessors(qw( record standing type CustomerDetail OrderDetail ));
 
 sub new {
 
@@ -118,6 +122,12 @@ sub _read_order_detail {
     my $YBPOrderKey  = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/YBPOrderKey') }[0];
     my $OrderPlaced  = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/OrderPlaced') }[0];
     my $Initials     = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/Initials') }[0];
+    my $LocalData;
+
+    foreach my $local_data ( @{ $xml->find('//PurchaseOrder/Order//OrderDetail/LocalData') } ) {
+        $LocalData->{ @{ $local_data->find('Description') }[0]->textContent }
+            = @{ $local_data->find('Value') }[0]->textContent;
+    }
 
     $order_detail->{ItemPONumber} = $ItemPONumber->textContent
         if defined $ItemPONumber;
@@ -135,6 +145,8 @@ sub _read_order_detail {
         if defined $OrderPlaced;
     $order_detail->{Initials} = $Initials->textContent
         if defined $Initials;
+    $order_detail->{LocalData} = $LocalData
+        if defined $LocalData;
 
     my $ListPriceAmount = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/ListPrice/Amount') }[0];
     my $ListPriceCurrency

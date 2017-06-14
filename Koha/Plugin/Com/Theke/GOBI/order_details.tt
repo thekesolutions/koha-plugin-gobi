@@ -20,21 +20,20 @@
     <div class="dialog alert">
         <h3>ERROR</h3>
         <p>There was a problem processing your request.</p>
+        <p>[% error %]</p>
     </div>
 
-	<form method="get">
+  <form method="post">
         <input type="hidden" name="class"  value="[% CLASS %]"/>
         <input type="hidden" name="method" value="[% METHOD %]"/>
-        <input type="hidden" name="step"   value="process"/>
+        <input type="hidden" name="step"   value="add"/>
         <p>
-            <label for="barcode">Paste your GOBI PO here: </label>
+            <label for="purchase-order-xml">Paste your new GOBI PO here: </label>
             <input type="text" name="purchase-order-xml"/>
-        </p>
-
-		<p><input type="submit" value="Submit" /></p>
-	</form>
+    <input type="submit" value="Submit" /></p>
+  </form>
 [% ELSE %]
-    <h3>GOBI Order added ([% gpo_id %])</h3>
+    <h3>GOBI Order added ([% gobi_order_id %])</h3>
     <ul>
         <li>ItemPONumber: [% gobi_order.OrderDetail.ItemPONumber %]</li>
         <li>Location: [% gobi_order.OrderDetail.Location %]</li>
