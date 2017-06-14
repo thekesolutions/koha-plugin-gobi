@@ -52,7 +52,9 @@ The following local data fields need to be set in _GOBI_:
 * **VendorCode**, filled with the vendor ID for _GOBI_.
 * **Library**, needs to be generated in _GOBI_ with branch/library information.
 
-And _funds_ codes need to be provided to _GOBI_ and they will be used on generating the _GOBI_ messages.
+_funds_ codes need to be provided to _GOBI_ and they will be used on generating the _GOBI_ messages.
+_GOBI_ handles **USD** and **GBP** as currency codes. They need to be set likewise in Koha.
+
 
 ## TODO
 
@@ -66,6 +68,9 @@ And _funds_ codes need to be provided to _GOBI_ and they will be used on generat
 * Authentication we currently only support cookie authentication, which is not enough.
   a hook to the plugins handling system could be needed. Or move it into _Koha_ proper
   (caveat: _Koha_'s REST api doesn't provide a way to do this either).
+
+Note: some of this things need to be discussed with _GOBI_ representatives to do some tests and
+have newer sample data. They've just renamed, and the sample data we have still mentions _YBP_.
 
 ## License
 
