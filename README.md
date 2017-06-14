@@ -43,6 +43,8 @@ to be defined and included on the message:
 * Library code: In _Koha_, the **branchcode** is used to identify different libraries/branches.
   _GOBI_ needs to know those codes to properly set the _homebranch_ and _holdingbranch_ for the
   generated items. It will be used to generate the local data field **Library**.
+* Currency: _GOBI_ only provides **USD** and **GBP** for currency codes. They need to be properly
+  set in _Koha_, and have their exchange rates set too.
 
 ### TL;DR
 
@@ -60,6 +62,10 @@ And _funds_ codes need to be provided to _GOBI_ and they will be used on generat
   This should be discussed with someone more familiar with acquisitions workflow.
 * It is not clear if GOBI price includes taxes, and which percentage.
 * There might be some discount applied that is not included on the GOBI message.
+* Is budget enough? Do we need to handle that?
+* Authentication we currently only support cookie authentication, which is not enough.
+  a hook to the plugins handling system could be needed. Or move it into _Koha_ proper
+  (caveat: _Koha_'s REST api doesn't provide a way to do this either).
 
 ## License
 
