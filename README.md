@@ -17,8 +17,8 @@ It follows the implicit _Koha_ workflow, which includes:
 3. Create a purchase basket.
 4. Store the GOBI order in the plugin's table, including the basketno
 5. Deal with MARC data. It implies checking for duplicates:
-..* There's a match, then use it.
-..* Add MARC record
+   * There's a match, then use it.
+   * Add MARC record
 6. Add the required items (based on _quantity_) if **AcqCreateItem** is set to ordering.
 7. Create an order, attach the items
 8. Close the purchase basket
