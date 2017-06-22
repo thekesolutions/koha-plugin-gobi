@@ -65,6 +65,9 @@ sub tool {
     elsif ( $step eq 'get' ) {
         $self->_get_order();
     }
+    elsif ( $step eq 'configure' ) {
+        $self->configure();
+    }
     else {
         # $step eq 'render'
         $self->_list_orders();
@@ -104,7 +107,8 @@ sub _add_order {
 
         # Create a basket
         $basketno = C4::Acquisition::NewBasket(
-            $vendor_code,              # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
+            $vendor_code
+            ,    # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
             $logged_user,              # $authorisedby
             $record->title,            # $basketname    TODO: MARC21 only?
             "GOBI order",              # $basketnote    TODO: Define what would be useful here
@@ -139,8 +143,9 @@ sub _add_order {
         my $koha_order = Koha::Acquisition::Order->new($order_data)->insert;
 
         # Are we configured to generate items on ordering?
-        if (    C4::Context->preference('AcqCreateItem') eq 'ordering'
-             && $quantity > 0 ) {
+        if ( C4::Context->preference('AcqCreateItem') eq 'ordering'
+            && $quantity > 0 )
+        {
             for ( my $i = 0; $i < $quantity; $i++ ) {
                 my $item_data
                     = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $library_code,
@@ -320,10 +325,12 @@ sub _generate_item_data {
 sub _add_price_data {
     my ( $self, $bookseller_id, $price, $quantity, $order_data ) = @_;
 
-    my $bookseller = Koha::Acquisition::Booksellers->find($bookseller_id);
+    my $bookseller      = Koha::Acquisition::Booksellers->find($bookseller_id);
     my $active_currency = Koha::Acquisition::Currencies->get_active;
+
     # Unformat price
     $price = Koha::Number::Price->new($price)->unformat;
+
     # Get tax and discounts info from the vendor
     my $tax_rate = $bookseller->tax_rate;
     my $discount = $bookseller->discount / 100;
@@ -333,23 +340,25 @@ sub _add_price_data {
 
     if ($price) {
         if ( $bookseller->listincgst ) {
+
             # Vendor includes GST
             $order_data->{ecost} = $price * ( 1 - $discount );
-            $order_data->{rrp}   = $price;
-        } else {
-            $order_data->{rrp}   = $price / ( 1 + $order_data->{tax_rate} );
+            $order_data->{rrp} = $price;
+        }
+        else {
+            $order_data->{rrp} = $price / ( 1 + $order_data->{tax_rate} );
             $order_data->{ecost} = $order_data->{rrp} * ( 1 - $discount );
         }
         $order_data->{listprice} = $order_data->{rrp} / $active_currency->rate;
         $order_data->{unitprice} = $order_data->{ecost};
         $order_data->{total}     = $order_data->{ecost} * $quantity;
-    } else {
+    }
+    else {
         $order_data->{listprice} = 0;
     }
 
     $order_data = C4::Acquisition::populate_order_with_prices(
-        {
-            order        => $order_data,
+        {   order        => $order_data,
             booksellerid => $bookseller_id,
             ordering     => 1,
             receiving    => 1,
@@ -365,18 +374,14 @@ sub _check_for_existing_bib {
     my $search_isbn = $isbn;
     $search_isbn =~ s/^\s*/%/xms;
     $search_isbn =~ s/\s*$/%/xms;
-    my $dbh = C4::Context->dbh;
-    my $sth
-        = $dbh->prepare( 'select biblionumber from biblioitems where isbn like ?',
-        );
+    my $dbh       = C4::Context->dbh;
+    my $sth       = $dbh->prepare( 'SELECT biblionumber FROM biblioitems WHERE isbn LIKE ?' );
     my $tuple_arr = $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
     if ( @{$tuple_arr} ) {
         return $tuple_arr->[0];
     }
     elsif ( length($isbn) == 13 && $isbn !~ /^97[89]/ ) {
-        my $tarr
-            = $dbh->selectall_arrayref(
-            'select biblionumber from biblioitems where ean = ?',
+        my $tarr = $dbh->selectall_arrayref( 'SELECT biblionumber FROM biblioitems WHERE ean = ?',
             { Slice => {} }, $isbn );
         if ( @{$tarr} ) {
             return $tarr->[0];
@@ -499,11 +504,11 @@ sub _table_exists {
 sub install {
     my ( $self, $args ) = @_;
 
-    my $table = $self->get_qualified_table_name('purchase_orders');
+    my $po_table   = $self->get_qualified_table_name('purchase_orders');
+    my $conf_table = $self->get_qualified_table_name('configuration');
 
-    return C4::Context->dbh->do(
-        q{
-        CREATE TABLE `$table` (
+    C4::Context->dbh->do(q{
+        CREATE TABLE `$po_table` (
           `id` INT(11) NOT NULL auto_increment,
           `status` TEXT,
           `basketno` INT(11) REFERENCES aqbasket( basketno),
@@ -512,8 +517,41 @@ sub install {
           KEY basketno ( basketno),
           CONSTRAINT gobipo_basketno FOREIGN KEY ( basketno ) REFERENCES aqbasket ( basketno ) ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-    }
-    );
+    }) unless $self->_table_exists($po_table);
+
+    C4::Context->dbh->do(q{
+        CREATE TABLE `$conf_table` (
+          `variable` varchar(50) NOT NULL default '',
+          `value` text,
+          PRIMARY KEY  (`variable`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+    }) unless $self->_table_exists($conf_table);
+
+    return 1;
+}
+
+sub configure {
+    my ( $self, $args ) = @_;
+
+    #my $table = $self->get_qualified_table_name('configuration');
+
+    my $cgi = $self->{cgi};
+
+    my $template = $self->get_template( { file => 'main.tt' } );
+
+    # Fetch from DB marching a criteria
+    my $table = $self->get_qualified_table_name('purchase_orders');
+    my $sth   = C4::Context->dbh->prepare( "
+        SELECT * FROM $table
+    " );
+
+    $sth->execute();
+    my $gobi_orders = $sth->fetchall_arrayref( {} );
+
+    $template->param( gobi_orders => $gobi_orders );
+
+    print $cgi->header( -charset => 'utf-8' );
+    print $template->output();
 }
 
 sub uninstall {

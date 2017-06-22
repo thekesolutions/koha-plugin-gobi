@@ -1,6 +1,11 @@
 [% INCLUDE 'doc-head-open.inc' %]
- <title>Koha: GOBI acq integration tool</title>
+ <title>Koha &rsaquo; Tools &rsaquo; GOBI acquisitions</title>
 [% INCLUDE 'doc-head-close.inc' %]
+  <style>
+    .gobi {
+      width: 70%;
+    }
+  </style>
 </head>
 <body>
 [% INCLUDE 'header.inc' %]
@@ -13,8 +18,10 @@
     <a href="?class=[% CLASS %]&method=[% METHOD %]">GOBI</a>
 </div>
 
-<div id="doc3">
-    <h3>GOBI acquisitions</h3>
+<div id="doc3" class="yui-t2">
+  <div id="yui-main">
+    <h2>GOBI acquisitions</h2>
+    <br/>
 
     [% IF ( error ) %]
     <div class="dialog alert">
@@ -23,39 +30,46 @@
     </div>
     [% END %]
 
-  <form method="post">
-        <input type="hidden" name="class"  value="[% CLASS %]"/>
-        <input type="hidden" name="method" value="[% METHOD %]"/>
-        <input type="hidden" name="step"   value="add"/>
-        <p>
-            <label for="purchase-order-xml">Paste your new GOBI PO here: </label>
-            <input type="text" name="purchase-order-xml"/>
-    <input type="submit" value="Submit" /></p>
-  </form>
+      <h4>Manually add new order</h4>
+      <form method="post">
+            <input type="hidden" name="class"  value="[% CLASS %]"/>
+            <input type="hidden" name="method" value="[% METHOD %]"/>
+            <input type="hidden" name="step"   value="add"/>
+            <p>
+                <label for="purchase-order-xml">Paste your new GOBI PO here: </label>
+                <input type="text" name="purchase-order-xml"/>
+        <input type="submit" value="Submit" /></p>
+      </form>
+      <br/>
 
-[% IF gobi_orders.size %]
-  <table class="table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>ItemPONumber</th>
-        <th>Status</th>
-        <th>Basket</th>
-        <th>MARC link</th>
-      </tr>
-    </thead>
-    <tbody>
-  [% FOREACH gobi_order IN gobi_orders %]
-      <tr>
-        <td><a href="?class=[% CLASS %]&method=[% METHOD %]&step=get&gobi_order_id=[% gobi_order.id %]">[% gobi_order.id %]</a></td>
-        <td>[% gobi_order.itemponumber %]</td>
-        <td>[% gobi_order.status %]</td>
-        <td>[% gobi_order.basketno %]</td>
-        <td><span class="error">TODO</span></td>
-      </tr>
-  [% END %]
-    </tbody>
-  </table>
-[% END %]
+    [% IF gobi_orders.size %]
+      <h4>Already processed</h4>
 
+      <table class="table gobi">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>ItemPONumber</th>
+            <th>Status</th>
+            <th>Basket</th>
+            <th>MARC link</th>
+          </tr>
+        </thead>
+        <tbody>
+      [% FOREACH gobi_order IN gobi_orders %]
+          <tr>
+            <td><a href="?class=[% CLASS %]&method=[% METHOD %]&step=get&gobi_order_id=[% gobi_order.id %]">[% gobi_order.id %]</a></td>
+            <td>[% gobi_order.itemponumber %]</td>
+            <td>[% gobi_order.status %]</td>
+            <td>[% gobi_order.basketno %]</td>
+            <td><span class="error">TODO</span></td>
+          </tr>
+      [% END %]
+        </tbody>
+      </table>
+    [% END %]
+  </div>
+  <div class="yui-b">
+    <div id="navmenu">&nbsp;</div>
+  </div>
 [% INCLUDE 'intranet-bottom.inc' %]
