@@ -1,0 +1,72 @@
+#!/usr/bin/perl
+
+# This file is part of koha-plugin-gobi.
+#
+# koha-plugin-gobi is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# koha-plugin-gobi is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with koha-plugin-gobi; if not, see <http://www.gnu.org/licenses>.
+
+use Modern::Perl;
+
+use CGI qw ( -utf8 );
+use Try::Tiny;
+
+# Add the plugin's dir to the libs path
+use FindBin;
+use lib "$FindBin::Bin/../../../../../";
+
+use Koha::Plugin::Com::Theke::GOBI;
+
+my $cgi  = new CGI;
+my $gobi = Koha::Plugin::Com::Theke::GOBI->new({ cgi => $cgi });
+my $api_key = $cgi->param( 'api_key' );
+
+# Check API key is present
+if ( !defined $api_key ) {
+    $gobi->response_error({
+        error_code => 'API_KEY_MISSING',
+        error_description => 'API Key parameter missing on request.'
+    });
+}
+# Check API key is valid
+if ( !$gobi->api_key_valid( $api_key ) ) {
+    $gobi->response_error({
+        error_code => 'API_KEY_INVALID',
+        error_description => "The API Key \"$api_key\" is an Invalid API Key."
+    });
+}
+else {
+# Ok, passed, moving on!
+    my $raw_gobi_order = $cgi->param('POSTDATA');
+    if ( !defined $raw_gobi_order ) {
+        $gobi->response_error({
+            error_code => 'ORDER_DATA_MISSING',
+            error_description => 'Purchase Order XML data is missing in POST.'
+        });
+    }
+
+    try {
+        my $koha_order = $gobi->add_order( $raw_gobi_order );
+        $gobi->response_success({
+            order_id => $koha_order->ordernumber,
+        });
+    }
+    catch {
+        # TODO: more fine grained error codes, need to talk to GOBI about it
+        $gobi->response_error({
+            error_code => 'REQUEST_PROCESSING_ERROR',
+            error_description => $_->error
+        });
+    };
+}
+
+1;
