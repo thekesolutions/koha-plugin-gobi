@@ -74,6 +74,41 @@ sub tool {
     }
 }
 
+sub response_success {
+    my ( $self, $params ) = @_;
+
+    my $template = $self->get_template({ file => 'response_success.tt' });
+
+    $template->param( order_id => $params->{ order_id } );
+
+    print $cgi->header(
+        -type     => 'text/xml',
+        -charset  => 'UTF-8',
+        -encoding => 'UTF-8'
+    );
+    print $template->output();
+    exit;
+}
+
+sub response_error {
+    my ( $self, $params ) = @_;
+
+    my $template = $self->get_template({ file => 'response_error.tt' });
+
+    $template->param(
+        error_code        => $params->{ error_code },
+        error_description => $params->{ error_description }
+    );
+
+    print $cgi->header(
+        -type     => 'text/xml',
+        -charset  => 'UTF-8',
+        -encoding => 'UTF-8'
+    );
+    print $template->output();
+    exit;
+}
+
 sub _add_order {
     my ( $self, $args ) = @_;
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Error>
+        <Code>[% error_code %]</Code>
+        <Message>[% error_message %]</Message>
+    </Error>
+</Response>
