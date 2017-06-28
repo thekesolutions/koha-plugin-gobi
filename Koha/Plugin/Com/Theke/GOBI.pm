@@ -66,7 +66,7 @@ sub tool {
         $self->_get_order();
     }
     elsif ( $step eq 'configure' ) {
-        $self->configure();
+        $self->_configure();
     }
     else {
         # $step eq 'render'
@@ -223,8 +223,12 @@ sub _list_orders {
 
     $sth->execute();
     my $gobi_orders = $sth->fetchall_arrayref( {} );
+    my $api_key = $self->_get_configuration({ variable => 'api_key' });
 
-    $template->param( gobi_orders => $gobi_orders );
+    $template->param(
+        api_key => $api_key,
+        gobi_orders => $gobi_orders
+    );
 
     print $cgi->header( -charset => 'utf-8' );
     print $template->output();
@@ -530,28 +534,99 @@ sub install {
     return 1;
 }
 
-sub configure {
+=head3 api_key_valid
+
+    This class method validates the passed API key against the stored one
+
+    my $ret = $self->api_key_valid( $passed_api_key );
+
+=cut
+
+sub api_key_valid {
+    my ( $self, $api_key ) = @_;
+
+    return unless defined $api_key;
+
+    my $gobi_api_key = $self->_get_configuration({ variable => 'api_key' });
+    my $ret;
+
+    if ( $api_key eq $gobi_api_key ) {
+        $ret = 1;
+    }
+
+    return $ret;
+}
+
+sub _configure {
     my ( $self, $args ) = @_;
 
-    #my $table = $self->get_qualified_table_name('configuration');
+    my $cgi     = $self->{cgi};
+    my $api_key = $cgi->param('api_key');
 
-    my $cgi = $self->{cgi};
+    # Store new API key
+    $self->_set_configuration( { variable => 'api_key', value => $api_key } );
 
-    my $template = $self->get_template( { file => 'main.tt' } );
+    $self->_list_orders();
+}
 
-    # Fetch from DB marching a criteria
-    my $table = $self->get_qualified_table_name('purchase_orders');
+sub _set_configuration {
+    my ( $self, $args ) = @_;
+
+    my $variable = $args->{variable};
+    return unless defined $variable;
+
+    my $value = $args->{value};
+
+    my $table = $self->get_qualified_table_name('configuration');
+
+    # Check variable exists
+    my $sth   = C4::Context->dbh->prepare("
+        SELECT value
+        FROM $table
+        WHERE variable=?
+    ");
+    $sth->execute($variable);
+    my $row = $sth->fetchrow_hashref();
+
+    if ( $row ) {
+        $sth = C4::Context->dbh->prepare("
+            UPDATE $table
+            SET value=?
+            WHERE variable=?
+        ");
+    }
+    else {
+        $sth = C4::Context->dbh->prepare("
+            INSERT INTO $table
+                ( `value`, `variable` )
+            VALUES
+                ( ?, ? )
+        ");
+    }
+    $sth->execute( $value, $variable );
+
+    return $value;
+}
+
+sub _get_configuration {
+    my ( $self, $args ) = @_;
+
+    my $variable = $args->{variable};
+    return unless defined $variable;
+
+    my $value;
+
+    my $table = $self->get_qualified_table_name('configuration');
     my $sth   = C4::Context->dbh->prepare( "
-        SELECT * FROM $table
-    " );
+        SELECT *
+        FROM $table
+        WHERE variable=?
+    ");
+    $sth->execute($variable);
+    my $row = $sth->fetchrow_hashref();
+    $value = $row->{value};
 
-    $sth->execute();
-    my $gobi_orders = $sth->fetchall_arrayref( {} );
-
-    $template->param( gobi_orders => $gobi_orders );
-
-    print $cgi->header( -charset => 'utf-8' );
-    print $template->output();
+    return $value;
 }
 
 sub uninstall {
