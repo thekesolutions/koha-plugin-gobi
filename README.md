@@ -25,6 +25,61 @@ It follows the implicit _Koha_ workflow, which includes:
 
 ## Installing
 
+The plugin system needs to be turned on by a system administrator.
+
+To set up the Koha plugin system you must first make some changes to your install.
+
+* Change `<enable_plugins>0<enable_plugins>` to `<enable_plugins>1</enable_plugins>` in your koha-conf.xml file
+* Confirm that the path to `<pluginsdir>` exists, is correct, and is writable by the web server
+* Restart _memcached_:
+```
+$ sudo systemctl restart memcached.service
+```
+* Restart _koha-common_:
+```
+$ sudo systemctl restart koha-common.service
+```
+
+Once set up is complete you will need to alter your UseKohaPlugins system preference. On the Tools page you will
+see the Tools Plugins.
+
+Download the .kpz file from the [releases page](https://github.com/thekesolutions/koha-plugin-gobi/releases).
+
+## Setup
+
+You need to tweak your _Apache_ vhost configuration for the intranet. If you are using the packages
+install method (you should!) given the instance name **instance** you need to edit the
+_/etc/apache2/sites-available/**instance**.conf_ file. Look for the intranet vhost and add this:
+
+```
+ScriptAlias /gobi "/var/lib/koha/instance/plugins/Koha/Plugin/Com/Theke/GOBI/gobi"
+Alias /plugin "/var/lib/koha/instance/plugins"
+<Directory /var/lib/koha/mykoha/plugins>
+      Options Indexes FollowSymLinks
+      AllowOverride None
+      Require all granted
+</Directory>
+```
+
+Then restart _apache_:
+```
+$ sudo systemctl restart apache2.service
+```
+
+You can test it is accessible using _curl_ like this from the command line:
+```
+vagrant@kohadevbox:~$ curl http://localhost:8080/gobi
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Error>
+        <Code>API_KEY_MISSING</Code>
+        <Message>API Key parameter missing on request.</Message>
+    </Error>
+</Response>
+```
+
+If you get a response from the api, you are on the right track.
+
 ## Using
 
 In order to use the plugin, a vendor needs to be created and properly configured following
