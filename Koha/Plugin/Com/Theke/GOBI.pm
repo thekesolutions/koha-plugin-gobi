@@ -1,5 +1,20 @@
 package Koha::Plugin::Com::Theke::GOBI;
 
+# This file is part of koha-plugin-gobi.
+#
+# koha-plugin-gobi is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# koha-plugin-gobi is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with koha-plugin-gobi; if not, see <http://www.gnu.org/licenses>.
+
 use Modern::Perl;
 use utf8;
 
@@ -21,7 +36,6 @@ use Koha::Number::Price;
 
 use Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
 
-use Data::Printer;
 use Try::Tiny;
 
 use MARC::Record;
@@ -96,16 +110,16 @@ $self->response_error({ order_id => 123456 });
 sub response_success {
     my ( $self, $params ) = @_;
 
-    my $template = $self->get_template({ file => 'response_success.tt' });
-
-    $template->param( order_id => $params->{ order_id } );
-
+    my $cgi = $self->{ cgi };
     print $cgi->header(
         -type     => 'text/xml',
         -charset  => 'UTF-8',
         -encoding => 'UTF-8'
     );
-    print $template->output();
+    say "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+    say "<Response>";
+    say "    <PoLineNumber>" . $params->{ order_id } . "</PoLineNumber>";
+    say "</Response>";
     exit;
 }
 
@@ -131,19 +145,19 @@ $self->response_error({ error_code => 'API_KEY_ERROR',
 sub response_error {
     my ( $self, $params ) = @_;
 
-    my $template = $self->get_template({ file => 'response_error.tt' });
-
-    $template->param(
-        error_code        => $params->{ error_code },
-        error_description => $params->{ error_description }
-    );
-
+    my $cgi = $self->{cgi};
     print $cgi->header(
         -type     => 'text/xml',
         -charset  => 'UTF-8',
         -encoding => 'UTF-8'
     );
-    print $template->output();
+    say "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+    say "<Response>";
+    say "    <Error>";
+    say "        <Code>" . $params->{ error_code } . "</Code>";
+    say "        <Message>" . $params->{ error_description } . "</Message>";
+    say "    </Error>";
+    say "</Response>";
     exit;
 }
 
@@ -169,6 +183,110 @@ sub api_key_valid {
     }
 
     return $ret;
+}
+
+=head2 add_order
+
+Given a raw GOBI order, go through the whole acquisitions workflow
+
+my $order_id = $self->add_order( $raw_gobi_order );
+
+=cut
+
+sub add_order {
+    my ( $self, $raw_gobi_order ) = @_;
+
+    my $cgi = $self->{cgi};
+    my $logged_user = C4::Auth::getborrowernumber();
+    my $basketno;
+    my $gobi_order;
+    my $gobi_order_id;
+    my $koha_order;
+
+    my @itemnumbers;
+
+    my $schema = Koha::Database->new()->schema();
+    $schema->storage->txn_begin();
+
+    try {
+        # Parse the raw purchase order
+        $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($raw_gobi_order);
+        my $record = $gobi_order->{record};
+        my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
+
+        # Some basic checks for data health
+        my $fund_id      = $self->_check_fund_code($gobi_order);
+        my $library_code = $self->_check_library_code($gobi_order);
+        my $vendor_code  = $self->_check_vendor_code($gobi_order);
+        my $currency     = $self->_check_currency($gobi_order);
+        my $price        = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
+        my $location     = $gobi_order->OrderDetail->{Location} // q{};        # no fk
+
+        # Create a basket
+        $basketno = C4::Acquisition::NewBasket(
+            $vendor_code
+            ,    # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
+            $logged_user,              # $authorisedby
+            $record->title,            # $basketname    TODO: MARC21 only?
+            "GOBI order",              # $basketnote    TODO: Define what would be useful here
+            q{},                       # $basketbooksellernote
+            undef,                     # $basketcontractnumber / unneeded for now
+            $library_code,
+            $library_code,
+            $gobi_order->{standing}    # $is_standing
+        );
+
+        # Store on the plugin table TODO: Figure what we would really need
+        $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basketno, $raw_gobi_order );
+
+        # Add biblio
+        my ( $biblionumber, $match ) = $self->_add_biblio_or_find_duplicate($record);
+
+        my $order_data = {
+            biblionumber               => $biblionumber,
+            basketno                   => $basketno,
+            budget_id                  => $fund_id,
+            listprice                  => $price,
+            quantity                   => $quantity,
+            quantityreceived           => 0,
+            order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
+            order_internalnote         => q{},
+            sort1                      => q{},
+            sort2                      => q{},
+            currency                   => $currency,
+            suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
+        };
+        $order_data = $self->_add_price_data( $vendor_code, $price, $quantity, $order_data );
+
+        $koha_order = Koha::Acquisition::Order->new($order_data)->insert;
+
+        # Are we configured to generate items on ordering?
+        if ( C4::Context->preference('AcqCreateItem') eq 'ordering'
+            && $quantity > 0 )
+        {
+            for ( my $i = 0; $i < $quantity; $i++ ) {
+                my $item_data
+                    = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $library_code,
+                    $location );
+                my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
+                push @itemnumbers, $itemnumber;
+            }
+            $koha_order->add_item($_) for @itemnumbers;
+        }
+        #C4::Acquisition::CloseBasket( $basketno );
+    }
+    catch {
+        # Problem found, rollback transaction, notify error
+        $schema->storage->txn_rollback();
+        if ( $_->isa('GOBI::Exception') ) {
+            $_->rethrow();
+        }
+        else {
+            GOBI::Exception::DBError->throw( $_ );
+        }
+    };
+    # All good, return Koha::Order
+    return $koha_order;
 }
 
 sub _add_order {

@@ -24,6 +24,10 @@ use Exception::Class (
     'GOBI::Exceptions::OrderDetailNotFound' => {
         isa         => 'GOBI::Exception',
         description => 'Mandatory OrderDetail not found'
+    },
+    'GOBI::Exceptions::DBError' => {
+        isa         => 'GOBI::Exception',
+        description => 'General DB error'
     }
 );
 
