@@ -39,6 +39,10 @@ our $metadata = {
     version         => $VERSION,
 };
 
+=head1 METHODS
+
+=cut
+
 sub new {
     my ( $class, $args ) = @_;
 
@@ -74,6 +78,21 @@ sub tool {
     }
 }
 
+=head2 response_sucess
+
+This method generates a valid success response for GOBI.
+
+$self->response_error({ order_id => 123456 });
+
+=head3 Response:
+
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+        <PoLineNumber>123456</PoLineNumber>
+    </Response>
+
+=cut
+
 sub response_success {
     my ( $self, $params ) = @_;
 
@@ -89,6 +108,25 @@ sub response_success {
     print $template->output();
     exit;
 }
+
+=head2 response_error
+
+This method generates a valid error response for GOBI.
+
+$self->response_error({ error_code => 'API_KEY_ERROR',
+                        error_description => 'Invalid API key' });
+
+=head3 Response:
+
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+        <Error>
+            <Code>API_KEY_ERROR</Code>
+            <Message>Invalid API key</Message>
+        </Error>
+    </Response>
+
+=cut
 
 sub response_error {
     my ( $self, $params ) = @_;
