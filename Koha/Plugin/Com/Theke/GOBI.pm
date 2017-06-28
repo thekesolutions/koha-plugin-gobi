@@ -147,6 +147,30 @@ sub response_error {
     exit;
 }
 
+=head2 api_key_valid
+
+This class method validates the passed API key against the stored one.
+
+my $ret = $self->api_key_valid( $passed_api_key );
+
+=cut
+
+sub api_key_valid {
+    my ( $self, $api_key ) = @_;
+
+    my $ret;
+
+    if ( defined $api_key ) {
+        my $gobi_api_key = $self->_get_configuration({ variable => 'api_key' });
+
+        if ( $api_key eq $gobi_api_key ) {
+            $ret = 1;
+        }
+    }
+
+    return $ret;
+}
+
 sub _add_order {
     my ( $self, $args ) = @_;
 
@@ -605,29 +629,6 @@ sub install {
     }) unless $self->_table_exists($conf_table);
 
     return 1;
-}
-
-=head3 api_key_valid
-
-    This class method validates the passed API key against the stored one
-
-    my $ret = $self->api_key_valid( $passed_api_key );
-
-=cut
-
-sub api_key_valid {
-    my ( $self, $api_key ) = @_;
-
-    return unless defined $api_key;
-
-    my $gobi_api_key = $self->_get_configuration({ variable => 'api_key' });
-    my $ret;
-
-    if ( $api_key eq $gobi_api_key ) {
-        $ret = 1;
-    }
-
-    return $ret;
 }
 
 sub _configure {
