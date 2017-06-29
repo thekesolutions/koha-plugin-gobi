@@ -57,7 +57,7 @@ else {
     try {
         my $koha_order = $gobi->add_order( $raw_gobi_order );
         $gobi->response_success({
-            order_id => $koha_order->ordernumber,
+            order_id => $koha_order->{ordernumber},
         });
     }
     catch {
