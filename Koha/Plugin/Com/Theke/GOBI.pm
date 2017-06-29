@@ -285,8 +285,8 @@ sub add_order {
             GOBI::Exception::DBError->throw( $_ );
         }
     };
-    # All good, return Koha::Order
-    return $koha_order;
+    # All good, return ordernumber
+    return $koha_order->{ordernumber};
 }
 
 sub _add_order {
@@ -749,6 +749,22 @@ sub install {
     return 1;
 }
 
+sub configure {
+    my ( $self, $args ) = @_;
+    my $cgi = $self->{cgi};
+
+    my $template = $self->get_template( { file => 'configure.tt' } );
+
+    my $api_key = $self->_get_configuration({ variable => 'api_key' });
+
+    $template->param(
+        api_key => $api_key,
+    );
+
+    print $cgi->header( -charset => 'utf-8' );
+    print $template->output();
+}
+
 sub _configure {
     my ( $self, $args ) = @_;
 
@@ -756,7 +772,7 @@ sub _configure {
     my $api_key = $cgi->param('api_key');
 
     # Store new API key
-    $self->_set_configuration( { variable => 'api_key', value => $api_key } );
+    $self->_set_configuration({ variable => 'api_key', value => $api_key });
 
     $self->_list_orders();
 }

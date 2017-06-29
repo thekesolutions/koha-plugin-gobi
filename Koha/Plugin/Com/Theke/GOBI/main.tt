@@ -30,18 +30,6 @@
     </div>
     [% END %]
 
-      <h4>Configure</h4>
-      <form method="post">
-            <input type="hidden" name="class"  value="[% CLASS %]"/>
-            <input type="hidden" name="method" value="[% METHOD %]"/>
-            <input type="hidden" name="step"   value="configure"/>
-            <p>
-                <label for="api_key">API Key: </label>
-                <input type="text" name="api_key" value="[% api_key %]" />
-        <input type="submit" value="Save" /></p>
-      </form>
-      <br/>
-
       <h4>Manually add new order</h4>
       <form method="post">
             <input type="hidden" name="class"  value="[% CLASS %]"/>

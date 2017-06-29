@@ -1,0 +1,39 @@
+[% INCLUDE 'doc-head-open.inc' %]
+ <title>Koha &rsaquo; Tools &rsaquo; GOBI acquisitions</title>
+[% INCLUDE 'doc-head-close.inc' %]
+  <style>
+    .gobi {
+      width: 70%;
+    }
+  </style>
+</head>
+<body>
+[% INCLUDE 'header.inc' %]
+[% INCLUDE 'cat-search.inc' %]
+
+<div id="breadcrumbs">
+    <a href="/cgi-bin/koha/mainpage.pl">Home</a> &rsaquo;
+    <a href="/cgi-bin/koha/mainpage.pl">Tools</a> &rsaquo;
+    <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a> &rsaquo;
+    <a href="?class=[% CLASS %]&method=tool">GOBI</a>
+</div>
+
+<div id="doc3" class="yui-t2">
+  <div id="yui-main">
+    <h2>GOBI acquisitions</h2>
+    <br/>
+      <h4>Configure</h4>
+      <form method="post">
+            <input type="hidden" name="class"  value="[% CLASS %]"/>
+            <input type="hidden" name="method" value="tool"/>
+            <input type="hidden" name="step"   value="configure"/>
+            <p>
+                <label for="api_key">API Key: </label>
+                <input type="text" name="api_key" value="[% api_key %]" />
+        <input type="submit" value="Save" /></p>
+      </form>
+  </div>
+  <div class="yui-b">
+    <div id="navmenu">&nbsp;</div>
+  </div>
+[% INCLUDE 'intranet-bottom.inc' %]
