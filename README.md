@@ -23,7 +23,7 @@ It follows the implicit _Koha_ workflow, which includes:
 7. Create an order, attach the items
 8. Close the purchase basket
 
-## Installing
+## Install and setup
 
 The plugin system needs to be turned on by a system administrator.
 
@@ -44,8 +44,6 @@ Once set up is complete you will need to alter your UseKohaPlugins system prefer
 see the Tools Plugins.
 
 Download the .kpz file from the [releases page](https://github.com/thekesolutions/koha-plugin-gobi/releases).
-
-## Setup
 
 You need to tweak your _Apache_ vhost configuration for the intranet. If you are using the packages
 install method (you should!) given the instance name **instance** you need to edit the
@@ -80,32 +78,36 @@ vagrant@kohadevbox:~$ curl http://localhost:8080/gobi
 
 If you get a response from the api, you are on the right track.
 
-## Using
+## Configure
 
 In order to use the plugin, a vendor needs to be created and properly configured following
 _GOBI_'s representatives advise (tax included?, tax rate?, etc). Some of this info might be
 hardcoded at some point if it's always the same, for simplicity. The approach was to make it
 as general as possible.
 
+* Fund codes: In Koha you create a _budget_ and then split it into _funds_. You need to provide
+  _GOBI_ with your fund codes list to link purchase orders and specific funds. It will be used
+  in the **FundCode** tag.
+* Currency: _GOBI_ only provides **USD** and **GBP** for currency codes. They need to be properly
+  set in _Koha_, and have their exchange rates set too.
+
 _GOBI_ provides a way to create local data fields for messages. This plugin requires some
 to be defined and included on the message:
 
 * Vendor code: As mentioned above, you need to create a vendor for EBSCO. Its ID needs to be
   provided for generating the **VendorCode** LocalData field.
-* Fund codes: In Koha you create a _budget_ and then split it into _funds_. You need to provide
-  _GOBI_ with your fund codes list to link purchase orders and specific funds. It will be used
-  in the **FundCode** tag.
 * Library code: In _Koha_, the **branchcode** is used to identify different libraries/branches.
   _GOBI_ needs to know those codes to properly set the _homebranch_ and _holdingbranch_ for the
   generated items. It will be used to generate the local data field **Library**.
-* Currency: _GOBI_ only provides **USD** and **GBP** for currency codes. They need to be properly
-  set in _Koha_, and have their exchange rates set too.
+* _GOBI_ borrowernumber: The local data field **GOBIUserID** needs to be sent along with the rest
+  of the local fiedls.
 
 ### TL;DR
 
 The following local data fields need to be set in _GOBI_:
 * **VendorCode**, filled with the vendor ID for _GOBI_.
 * **Library**, needs to be generated in _GOBI_ with branch/library information.
+* **GOBIUserID**, filed with a borrowernumber _Koha_ has set for identifying GOBI-generated orders.
 
 _funds_ codes need to be provided to _GOBI_ and they will be used on generating the _GOBI_ messages.
 _GOBI_ handles **USD** and **GBP** as currency codes. They need to be set likewise in Koha.
