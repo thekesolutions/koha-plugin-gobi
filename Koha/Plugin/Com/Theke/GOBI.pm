@@ -175,7 +175,7 @@ sub api_key_valid {
     my $ret;
 
     if ( defined $api_key ) {
-        my $gobi_api_key = $self->_get_configuration({ variable => 'api_key' });
+        my $gobi_api_key = $self->retrieve_data( 'api_key' );
 
         if ( $api_key eq $gobi_api_key ) {
             $ret = 1;
@@ -438,7 +438,7 @@ sub _list_orders {
 
     $sth->execute();
     my $gobi_orders = $sth->fetchall_arrayref( {} );
-    my $api_key = $self->_get_configuration({ variable => 'api_key' });
+    my $api_key = $self->retrieve_data( 'api_key' );
 
     $template->param(
         api_key => $api_key,
@@ -723,11 +723,10 @@ sub _table_exists {
 sub install {
     my ( $self, $args ) = @_;
 
-    my $po_table   = $self->get_qualified_table_name('purchase_orders');
-    my $conf_table = $self->get_qualified_table_name('configuration');
+    my $po_table = $self->get_qualified_table_name('purchase_orders');
 
-    C4::Context->dbh->do(q{
-        CREATE TABLE `$po_table` (
+    C4::Context->dbh->do("
+        CREATE TABLE $po_table (
           `id` INT(11) NOT NULL auto_increment,
           `status` TEXT,
           `basketno` INT(11) REFERENCES aqbasket( basketno),
@@ -736,15 +735,7 @@ sub install {
           KEY basketno ( basketno),
           CONSTRAINT gobipo_basketno FOREIGN KEY ( basketno ) REFERENCES aqbasket ( basketno ) ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-    }) unless $self->_table_exists($po_table);
-
-    C4::Context->dbh->do(q{
-        CREATE TABLE `$conf_table` (
-          `variable` varchar(50) NOT NULL default '',
-          `value` text,
-          PRIMARY KEY  (`variable`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-    }) unless $self->_table_exists($conf_table);
+    ") unless $self->_table_exists($po_table);
 
     return 1;
 }
@@ -755,7 +746,7 @@ sub configure {
 
     my $template = $self->get_template( { file => 'configure.tt' } );
 
-    my $api_key = $self->_get_configuration({ variable => 'api_key' });
+    my $api_key = $self->retrieve_data( 'api_key' );
 
     $template->param(
         api_key => $api_key,
@@ -772,69 +763,9 @@ sub _configure {
     my $api_key = $cgi->param('api_key');
 
     # Store new API key
-    $self->_set_configuration({ variable => 'api_key', value => $api_key });
+    $self->store_data({ 'api_key' => $api_key });
 
     $self->_list_orders();
-}
-
-sub _set_configuration {
-    my ( $self, $args ) = @_;
-
-    my $variable = $args->{variable};
-    return unless defined $variable;
-
-    my $value = $args->{value};
-
-    my $table = $self->get_qualified_table_name('configuration');
-
-    # Check variable exists
-    my $sth   = C4::Context->dbh->prepare("
-        SELECT value
-        FROM $table
-        WHERE variable=?
-    ");
-    $sth->execute($variable);
-    my $row = $sth->fetchrow_hashref();
-
-    if ( $row ) {
-        $sth = C4::Context->dbh->prepare("
-            UPDATE $table
-            SET value=?
-            WHERE variable=?
-        ");
-    }
-    else {
-        $sth = C4::Context->dbh->prepare("
-            INSERT INTO $table
-                ( `value`, `variable` )
-            VALUES
-                ( ?, ? )
-        ");
-    }
-    $sth->execute( $value, $variable );
-
-    return $value;
-}
-
-sub _get_configuration {
-    my ( $self, $args ) = @_;
-
-    my $variable = $args->{variable};
-    return unless defined $variable;
-
-    my $value;
-
-    my $table = $self->get_qualified_table_name('configuration');
-    my $sth   = C4::Context->dbh->prepare( "
-        SELECT *
-        FROM $table
-        WHERE variable=?
-    ");
-    $sth->execute($variable);
-    my $row = $sth->fetchrow_hashref();
-    $value = $row->{value};
-
-    return $value;
 }
 
 sub uninstall {
