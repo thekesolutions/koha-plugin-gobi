@@ -6,6 +6,25 @@
       width: 70%;
     }
   </style>
+  <script type="text/javascript">
+
+      $(document).ready(function(){
+        $("#refresh").on("click",function(e){
+            e.preventDefault;
+            $('#api_key').val(gen_api_key(32));
+        });
+      });
+
+      function gen_api_key(size) {
+        var output = "";
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+        for (var i = 0; i < size; i++)
+          output += chars.charAt(Math.floor(Math.random() * chars.length));
+
+        return output;
+      }
+  </script>
 </head>
 <body>
 [% INCLUDE 'header.inc' %]
@@ -28,9 +47,15 @@
             <input type="hidden" name="method" value="tool"/>
             <input type="hidden" name="step"   value="configure"/>
             <p>
-                <label for="api_key">API Key: </label>
-                <input type="text" name="api_key" value="[% api_key %]" />
-        <input type="submit" value="Save" /></p>
+              <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="api_key_label">API KEY</span>
+                <input type="text" class="form-control" aria-describedby="api_key_label" name="api_key" id="api_key" value="[% api_key %]" />
+                <span class="input-group-btn">
+                    <span class="btn btn-default" id="refresh"><i class="fa fa-refresh" aria-hidden="true"></i></span>
+                    <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
+                </span>
+              </div>
+            </p>
       </form>
   </div>
   <div class="yui-b">
