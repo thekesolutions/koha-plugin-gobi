@@ -197,7 +197,6 @@ sub add_order {
     my ( $self, $raw_gobi_order ) = @_;
 
     my $cgi = $self->{cgi};
-    my $logged_user = C4::Auth::getborrowernumber();
     my $basketno;
     my $gobi_order;
     my $gobi_order_id;
@@ -215,25 +214,24 @@ sub add_order {
         my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
 
         # Some basic checks for data health
-        my $fund_id      = $self->_check_fund_code($gobi_order);
-        my $library_code = $self->_check_library_code($gobi_order);
-        my $vendor_code  = $self->_check_vendor_code($gobi_order);
-        my $currency     = $self->_check_currency($gobi_order);
-        my $price        = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
-        my $location     = $gobi_order->OrderDetail->{Location} // q{};        # no fk
+        my $fund_id   = $self->_check_fund_code($gobi_order);
+        # my $vendor_code  = $self->_check_vendor_code($gobi_order);
+        my $vendor_id = $self->retrieve_data('vendor_id');
+        my $currency  = $self->_check_currency($gobi_order);
+        my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
+        my $location  = $gobi_order->OrderDetail->{Location} // q{};        # no fk
 
         # Create a basket
         $basketno = C4::Acquisition::NewBasket(
-            $vendor_code
-            ,    # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
-            $logged_user,              # $authorisedby
-            $record->title,            # $basketname    TODO: MARC21 only?
-            "GOBI order",              # $basketnote    TODO: Define what would be useful here
-            q{},                       # $basketbooksellernote
-            undef,                     # $basketcontractnumber / unneeded for now
-            $library_code,
-            $library_code,
-            $gobi_order->{standing}    # $is_standing
+            $vendor_id,             # booksellerid
+            undef,                  # authorisedby
+            $record->title // '',   # $basketname    TODO: MARC21 only?
+            q{},                    # $basketnote    TODO: Define what would be useful here
+            q{},                    # $basketbooksellernote
+            undef                   # $basketcontractnumber / unneeded for now
+            undef,                  # homebranch
+            undef,                  #
+            $gobi_order->{standing} # is_standing
         );
 
         # Store on the plugin table TODO: Figure what we would really need
@@ -256,7 +254,7 @@ sub add_order {
             currency                   => $currency,
             suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
         };
-        $order_data = $self->_add_price_data( $vendor_code, $price, $quantity, $order_data );
+        $order_data = $self->_add_price_data( $vendor_id, $price, $quantity, $order_data );
 
         $koha_order = Koha::Acquisition::Order->new($order_data)->insert;
 
@@ -266,8 +264,7 @@ sub add_order {
         {
             for ( my $i = 0; $i < $quantity; $i++ ) {
                 my $item_data
-                    = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $library_code,
-                    $location );
+                    = $self->_generate_item_data( $gobi_order, $vendor_id, $price, $location );
                 my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
                 push @itemnumbers, $itemnumber;
             }
@@ -322,16 +319,15 @@ sub _add_order {
 
         # Create a basket
         $basketno = C4::Acquisition::NewBasket(
-            $vendor_code
-            ,    # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
-            $logged_user,              # $authorisedby
-            $record->title,            # $basketname    TODO: MARC21 only?
-            "GOBI order",              # $basketnote    TODO: Define what would be useful here
-            q{},                       # $basketbooksellernote
-            undef,                     # $basketcontractnumber / unneeded for now
-            $library_code,
-            $library_code,
-            $gobi_order->{standing}    # $is_standing
+            $vendor_code,           # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
+            undef,                  # $authorisedby
+            $record->title // '',   # $basketname    TODO: MARC21 only?
+            q{},                    # $basketnote    TODO: Define what would be useful here
+            q{},                    # $basketbooksellernote
+            undef,                  # $basketcontractnumber / unneeded for now
+            undef,                  # home_library
+            undef,                  # holding_library
+            $gobi_order->{standing} # is_standing
         );
 
         # Store on the plugin table TODO: Figure what we would really need
@@ -363,8 +359,7 @@ sub _add_order {
         {
             for ( my $i = 0; $i < $quantity; $i++ ) {
                 my $item_data
-                    = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $library_code,
-                    $location );
+                    = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $location );
                 my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
                 push @itemnumbers, $itemnumber;
             }
@@ -438,11 +433,9 @@ sub _list_orders {
 
     $sth->execute();
     my $gobi_orders = $sth->fetchall_arrayref( {} );
-    my $api_key = $self->retrieve_data( 'api_key' );
 
     $template->param(
-        api_key => $api_key,
-        gobi_orders => $gobi_orders
+        gobi_orders => $gobi_orders,
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -524,14 +517,14 @@ sub _add_biblio_or_find_duplicate {
 }
 
 sub _generate_item_data {
-    my ( $self, $gobi_order, $vendor_code, $price, $library, $location ) = @_;
+    my ( $self, $gobi_order, $vendor_id, $price, $location ) = @_;
 
     my $item_data = {
-        booksellerid     => $vendor_code,
+        booksellerid     => $vendor_id,
         cn_source        => C4::Context->preference('DefaultClassificationSource'),
         cn_sort          => q{},
-        holdingbranch    => $library,
-        homebranch       => $library,
+        holdingbranch    => undef,
+        homebranch       => undef,
         location         => $location,
         notforloan       => -1,
         price            => $price,
@@ -744,12 +737,14 @@ sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
 
-    my $template = $self->get_template( { file => 'configure.tt' } );
+    my $template = $self->get_template({ file => 'configure.tt' });
 
-    my $api_key = $self->retrieve_data( 'api_key' );
+    my $api_key   = $self->retrieve_data( 'api_key' );
+    my $vendor_id = $self->retrieve_data( 'vendor_id' );
 
     $template->param(
-        api_key => $api_key,
+        api_key   => $api_key,
+        vendor_id => $vendor_id
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -759,11 +754,13 @@ sub configure {
 sub _configure {
     my ( $self, $args ) = @_;
 
-    my $cgi     = $self->{cgi};
-    my $api_key = $cgi->param('api_key');
+    my $cgi       = $self->{cgi};
+    my $api_key   = $cgi->param('api_key');
+    my $vendor_id = $cgi->param('vendor_id');
 
     # Store new API key
-    $self->store_data({ 'api_key' => $api_key });
+    $self->store_data({ 'api_key'   => $api_key });
+    $self->store_data({ 'vendor_id' => $vendor_id });
 
     $self->_list_orders();
 }
