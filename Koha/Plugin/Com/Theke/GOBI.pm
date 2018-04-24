@@ -40,14 +40,14 @@ use Try::Tiny;
 
 use MARC::Record;
 
-our $VERSION = 0.1;
+our $VERSION = 0.5;
 
 our $metadata = {
     name            => 'GOBI integration',
     author          => 'Theke Solutions',
     description     => 'Integrates GOBI with Koha',
     date_authored   => '2017-05-10',
-    date_updated    => '2017-09-12',
+    date_updated    => '2018-04-24',
     minimum_version => '17.0500000',
     maximum_version => undef,
     version         => $VERSION,
