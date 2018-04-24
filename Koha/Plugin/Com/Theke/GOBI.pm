@@ -40,7 +40,7 @@ use Try::Tiny;
 
 use MARC::Record;
 
-our $VERSION = 0.5;
+our $VERSION = 0.6;
 
 our $metadata = {
     name            => 'GOBI integration',

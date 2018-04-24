@@ -28,7 +28,7 @@ use Koha::Plugin::Com::Theke::GOBI;
 
 my $cgi  = new CGI;
 my $gobi = Koha::Plugin::Com::Theke::GOBI->new({ cgi => $cgi });
-my $api_key = $cgi->param( 'api_key' );
+my $api_key = $cgi->url_param('api_key');
 
 # Check API key is present
 if ( !defined $api_key ) {
