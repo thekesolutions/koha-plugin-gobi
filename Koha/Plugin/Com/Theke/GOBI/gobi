@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+# Copyright 2018 Theke Solutions
+#
 # This file is part of koha-plugin-gobi.
 #
 # koha-plugin-gobi is free software; you can redistribute it and/or modify it
@@ -25,9 +27,10 @@ use FindBin;
 use lib "$FindBin::Bin/../../../../../";
 
 use Koha::Plugin::Com::Theke::GOBI;
+use Koha::Plugin::Com::Theke::GOBI::Exception;
 
-my $cgi  = new CGI;
-my $gobi = Koha::Plugin::Com::Theke::GOBI->new({ cgi => $cgi });
+my $cgi     = new CGI;
+my $gobi    = Koha::Plugin::Com::Theke::GOBI->new({ cgi => $cgi });
 my $api_key = $cgi->url_param('api_key');
 
 # Check API key is present
@@ -56,6 +59,9 @@ else {
 
     try {
         my $koha_order_number = $gobi->add_order( $raw_gobi_order );
+        unless ( $koha_order_number ) {
+            GOBI::Exception->throw('No order generated.');
+        }
         $gobi->response_success({
             order_id => $koha_order_number,
         });

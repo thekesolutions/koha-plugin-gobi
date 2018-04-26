@@ -33,13 +33,13 @@
     <input type="submit" value="Submit" /></p>
   </form>
 [% ELSE %]
-    <h3>GOBI Order added ([% gobi_order_id %])</h3>
+    <h3>GOBI Order added ([% gpo_id %])</h3>
     <ul>
         <li>ItemPONumber: [% gobi_order.OrderDetail.ItemPONumber %]</li>
         <li>Location: [% gobi_order.OrderDetail.Location %]</li>
         <li>Quantity: [% gobi_order.OrderDetail.Quantity %]</li>
         <li>YBPOrderKey: [% gobi_order.OrderDetail.YBPOrderKey %]</li>
-        <li><a href="?class=[% CLASS %]&method=[% METHOD %]&step=process_marc&gobi_order_id=[% gpo_id %]">Process MARC</a></li>
+        <!--li><a href="?class=[% CLASS %]&method=[% METHOD %]&step=process_marc&gobi_order_id=[% gpo_id %]">Process MARC</a></li-->
     </ul>
 [% END %]
 

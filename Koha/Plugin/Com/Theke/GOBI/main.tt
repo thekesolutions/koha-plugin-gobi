@@ -30,7 +30,7 @@
     </div>
     [% END %]
 
-      <h4>Manually add new order</h4>
+      <!--h4>Manually add new order</h4>
       <form method="post">
             <input type="hidden" name="class"  value="[% CLASS %]"/>
             <input type="hidden" name="method" value="[% METHOD %]"/>
@@ -40,7 +40,7 @@
                 <input type="text" name="purchase-order-xml"/>
         <input type="submit" value="Submit" /></p>
       </form>
-      <br/>
+      <br/-->
 
     [% IF gobi_orders.size %]
       <h4>Already processed</h4>
@@ -59,7 +59,7 @@
       [% FOREACH gobi_order IN gobi_orders %]
           <tr>
             <td><a href="?class=[% CLASS %]&method=[% METHOD %]&step=get&gobi_order_id=[% gobi_order.id %]">[% gobi_order.id %]</a></td>
-            <td>[% gobi_order.itemponumber %]</td>
+            <td>[% gobi_order.item_po_number %]</td>
             <td>[% gobi_order.status %]</td>
             <td>[% gobi_order.basketno %]</td>
             <td><span class="error">TODO</span></td>

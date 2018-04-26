@@ -1,5 +1,7 @@
 package Koha::Plugin::Com::Theke::GOBI;
 
+# Copyright 2018 Theke Solutions
+#
 # This file is part of koha-plugin-gobi.
 #
 # koha-plugin-gobi is free software; you can redistribute it and/or modify it
@@ -35,7 +37,9 @@ use Koha::Libraries;
 use Koha::Number::Price;
 
 use Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
+use Koha::Plugin::Com::Theke::GOBI::Exception;
 
+use Data::Printer;
 use Try::Tiny;
 
 use MARC::Record;
@@ -52,6 +56,10 @@ our $metadata = {
     maximum_version => undef,
     version         => $VERSION,
 };
+
+use Exception::Class (
+    'GOBI::Exception'
+);
 
 =head1 METHODS
 
@@ -207,9 +215,10 @@ sub add_order {
     my $schema = Koha::Database->new()->schema();
     $schema->storage->txn_begin();
 
-    try {
+    my $result = try {
         # Parse the raw purchase order
         $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($raw_gobi_order);
+
         my $record = $gobi_order->{record};
         my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
 
@@ -224,14 +233,11 @@ sub add_order {
         # Create a basket
         $basketno = C4::Acquisition::NewBasket(
             $vendor_id,             # booksellerid
-            undef,                  # authorisedby
-            $record->title // '',   # $basketname    TODO: MARC21 only?
+            0,                      # authorisedby
+            $gobi_order->OrderDetail->{ItemPONumber},         # $basketname    TODO: MARC21 only?
             q{},                    # $basketnote    TODO: Define what would be useful here
             q{},                    # $basketbooksellernote
-            undef                   # $basketcontractnumber / unneeded for now
-            undef,                  # homebranch
-            undef,                  #
-            $gobi_order->{standing} # is_standing
+            q{}                   # $basketcontractnumber / unneeded for now
         );
 
         # Store on the plugin table TODO: Figure what we would really need
@@ -256,21 +262,25 @@ sub add_order {
         };
         $order_data = $self->_add_price_data( $vendor_id, $price, $quantity, $order_data );
 
-        $koha_order = Koha::Acquisition::Order->new($order_data)->insert;
+        $koha_order = Koha::Acquisition::Order->new($order_data);
+        $koha_order->store;
+        $koha_order->discard_changes;
 
         # Are we configured to generate items on ordering?
         if ( C4::Context->preference('AcqCreateItem') eq 'ordering'
             && $quantity > 0 )
         {
             for ( my $i = 0; $i < $quantity; $i++ ) {
-                my $item_data
-                    = $self->_generate_item_data( $gobi_order, $vendor_id, $price, $location );
+                my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price, $location );
                 my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
                 push @itemnumbers, $itemnumber;
+                $koha_order->add_item($itemnumber);
             }
-            $koha_order->add_item($_) for @itemnumbers;
         }
-        #C4::Acquisition::CloseBasket( $basketno );
+
+        $schema->storage->txn_commit;
+        # All good, return ordernumber
+        return $koha_order;
     }
     catch {
         # Problem found, rollback transaction, notify error
@@ -279,11 +289,16 @@ sub add_order {
             $_->rethrow();
         }
         else {
-            GOBI::Exception::DBError->throw( $_ );
+            GOBI::Exception->throw( "$_" );
         }
     };
-    # All good, return ordernumber
-    return $koha_order->{ordernumber};
+
+    if ( $result->isa('GOBI::Exception') ) {
+        $result->rethrow();
+    }
+    else {
+        return $result->ordernumber;
+    }
 }
 
 sub _add_order {
@@ -351,7 +366,7 @@ sub _add_order {
             suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
         };
         $order_data = $self->_add_price_data( $vendor_code, $price, $quantity, $order_data );
-        my $koha_order = Koha::Acquisition::Order->new($order_data)->insert;
+        my $koha_order = Koha::Acquisition::Order->new($order_data)->store->discard_changes;
 
         # Are we configured to generate items on ordering?
         if ( C4::Context->preference('AcqCreateItem') eq 'ordering'
@@ -448,11 +463,11 @@ sub _store_gobi_order {
     my $table = $self->get_qualified_table_name('purchase_orders');
     my $sth   = C4::Context->dbh->prepare( "
         INSERT INTO $table
-               ( itemponumber, status, basketno, raw_msg )
-        VALUES ( ?,            ?,      ?,        ? )
+               ( status, basketno, raw_msg )
+        VALUES ( ?,      ?,        ? )
     " );
 
-    $sth->execute( $gobi_order->{OrderDetail}->{ItemPONumber}, 'processed', $basketno, $raw );
+    $sth->execute( 'processed', $basketno, $raw );
 
     my $gpo_id = C4::Context->dbh->{'mysql_insertid'};
 
