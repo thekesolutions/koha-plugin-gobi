@@ -39,12 +39,11 @@ use Koha::Number::Price;
 use Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
 use Koha::Plugin::Com::Theke::GOBI::Exception;
 
-use Data::Printer;
 use Try::Tiny;
 
 use MARC::Record;
 
-our $VERSION = 0.7;
+our $VERSION = 0.7.1;
 
 our $metadata = {
     name            => 'GOBI integration',
