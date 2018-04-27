@@ -278,6 +278,8 @@ sub add_order {
             }
         }
 
+        C4::Acquisition::CloseBasket( $basketno );
+
         $schema->storage->txn_commit;
         # All good, return ordernumber
         return $koha_order;
