@@ -48,7 +48,7 @@ our $VERSION = "{VERSION}";
 
 our $metadata = {
     name            => 'GOBI integration',
-    author          => 'Theke Solutions',
+    author          => 'Tomas Cohen Arazi',
     description     => 'Integrates GOBI with Koha',
     date_authored   => '2017-05-10',
     date_updated    => '2018-04-26',
@@ -205,7 +205,6 @@ sub add_order {
     my ( $self, $raw_gobi_order ) = @_;
 
     my $cgi = $self->{cgi};
-    my $basketno;
     my $gobi_order;
     my $gobi_order_id;
     my $koha_order;
@@ -231,7 +230,7 @@ sub add_order {
         my $location  = $gobi_order->OrderDetail->{Location} // q{};        # no fk
 
         # Create a basket
-        $basketno = C4::Acquisition::NewBasket(
+        my $basket_id = C4::Acquisition::NewBasket(
             $vendor_id,             # booksellerid
             0,                      # authorisedby
             $gobi_order->OrderDetail->{ItemPONumber},         # $basketname    TODO: MARC21 only?
@@ -241,14 +240,14 @@ sub add_order {
         );
 
         # Store on the plugin table TODO: Figure what we would really need
-        $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basketno, $raw_gobi_order );
+        $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
         # Add biblio
         my ( $biblionumber, $match ) = $self->_add_biblio_or_find_duplicate($record);
 
         my $order_data = {
             biblionumber               => $biblionumber,
-            basketno                   => $basketno,
+            basketno                   => $basket_id,
             budget_id                  => $fund_id,
             listprice                  => $price,
             quantity                   => $quantity,
@@ -278,11 +277,11 @@ sub add_order {
             }
         }
 
-        C4::Acquisition::CloseBasket( $basketno );
+        C4::Acquisition::CloseBasket( $basket_id );
 
         $schema->storage->txn_commit;
         # All good, return ordernumber
-        return $koha_order;
+        return $basket_id;
     }
     catch {
         # Problem found, rollback transaction, notify error
@@ -299,7 +298,7 @@ sub add_order {
         $result->rethrow();
     }
     else {
-        return $result->ordernumber;
+        return $result;
     }
 }
 
