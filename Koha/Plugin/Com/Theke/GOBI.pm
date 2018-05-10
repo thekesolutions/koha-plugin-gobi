@@ -243,7 +243,7 @@ sub add_order {
         $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
         # Add biblio
-        my ( $biblionumber, $match ) = $self->_add_biblio_or_find_duplicate($record);
+        my $biblionumber = $self->_add_biblio($record);
 
         my $order_data = {
             biblionumber               => $biblionumber,
@@ -300,108 +300,6 @@ sub add_order {
     else {
         return $result;
     }
-}
-
-sub _add_order {
-    my ( $self, $args ) = @_;
-
-    my $cgi                = $self->{cgi};
-    my $purchase_order_raw = $cgi->param('purchase-order-xml');
-    my $template           = $self->get_template( { file => 'order_details.tt' } );
-
-    my $logged_user = C4::Auth::getborrowernumber();
-    my $basketno;
-    my $gobi_order;
-    my $gobi_order_id;
-
-    my @itemnumbers;
-
-    my $schema = Koha::Database->new()->schema();
-    $schema->storage->txn_begin();
-
-    try {
-        # Parse the raw purchase order
-        $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($purchase_order_raw);
-        my $record = $gobi_order->{record};
-        my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
-
-        # Some basic checks for data health
-        my $fund_id      = $self->_check_fund_code($gobi_order);
-        my $library_code = $self->_check_library_code($gobi_order);
-        my $vendor_code  = $self->_check_vendor_code($gobi_order);
-        my $currency     = $self->_check_currency($gobi_order);
-        my $price        = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
-        my $location     = $gobi_order->OrderDetail->{Location} // q{};        # no fk
-
-        # Create a basket
-        $basketno = C4::Acquisition::NewBasket(
-            $vendor_code,           # $booksellerid  TODO: Discuss syspref/config vs. LocalData on GOBI message
-            undef,                  # $authorisedby
-            $record->title // '',   # $basketname    TODO: MARC21 only?
-            q{},                    # $basketnote    TODO: Define what would be useful here
-            q{},                    # $basketbooksellernote
-            undef,                  # $basketcontractnumber / unneeded for now
-            undef,                  # home_library
-            undef,                  # holding_library
-            $gobi_order->{standing} # is_standing
-        );
-
-        # Store on the plugin table TODO: Figure what we would really need
-        $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basketno, $purchase_order_raw );
-
-        # Add biblio
-        my ( $biblionumber, $match ) = $self->_add_biblio_or_find_duplicate($record);
-
-        my $order_data = {
-            biblionumber               => $biblionumber,
-            basketno                   => $basketno,
-            budget_id                  => $fund_id,
-            listprice                  => $price,
-            quantity                   => $quantity,
-            quantityreceived           => 0,
-            order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
-            order_internalnote         => q{},
-            sort1                      => q{},
-            sort2                      => q{},
-            currency                   => $currency,
-            suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
-        };
-        $order_data = $self->_add_price_data( $vendor_code, $price, $quantity, $order_data );
-        my $koha_order = Koha::Acquisition::Order->new($order_data)->store->discard_changes;
-
-        # Are we configured to generate items on ordering?
-        if ( C4::Context->preference('AcqCreateItem') eq 'ordering'
-            && $quantity > 0 )
-        {
-            for ( my $i = 0; $i < $quantity; $i++ ) {
-                my $item_data
-                    = $self->_generate_item_data( $gobi_order, $vendor_code, $price, $location );
-                my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
-                push @itemnumbers, $itemnumber;
-            }
-            $koha_order->add_item($_) for @itemnumbers;
-        }
-
-        #C4::Acquisition::CloseBasket( $basketno );
-    }
-    catch {
-        # Problem found, rollback transaction, notify error
-        $schema->storage->txn_rollback();
-        if ( $_->isa('GOBI::Exception') ) {
-            $template->param( error => $_->error );
-        }
-        else {
-            $template->param( error => $_ );
-        }
-    };
-
-    $template->param(
-        gobi_order    => $gobi_order,
-        gobi_order_id => $gobi_order_id
-    );
-
-    print $cgi->header( -charset => 'utf-8' );
-    print $template->output();
 }
 
 sub _get_order {
@@ -510,26 +408,16 @@ sub _get_gobi_order {
     };
 }
 
-sub _add_biblio_or_find_duplicate {
+sub _add_biblio {
 
     my ( $self, $record ) = @_;
 
     # TODO: GOBI passes MARC21 records. Maybe prepare for future changes
     my $isbn = $record->subfield( '020', 'a' );
-    my $match;
 
-    my $biblionumber = _check_for_existing_bib($isbn);
-    if ( !defined $biblionumber ) {
+    my ( $biblionumber, undef ) = AddBiblio( $record, '' );
 
-        # No match, add the record
-        ( $biblionumber, undef ) = AddBiblio( $record, '' );
-        $match = 0;
-    }
-    else {
-        $match = 1;
-    }
-
-    return ( $biblionumber, $match );
+    return $biblionumber;
 }
 
 sub _generate_item_data {
@@ -594,53 +482,6 @@ sub _add_price_data {
     );
 
     return $order_data;
-}
-
-sub _check_for_existing_bib {
-    my $isbn = shift;
-
-    my $search_isbn = $isbn;
-    $search_isbn =~ s/^\s*/%/xms;
-    $search_isbn =~ s/\s*$/%/xms;
-    my $dbh       = C4::Context->dbh;
-    my $sth       = $dbh->prepare( 'SELECT biblionumber FROM biblioitems WHERE isbn LIKE ?' );
-    my $tuple_arr = $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
-    if ( @{$tuple_arr} ) {
-        return $tuple_arr->[0];
-    }
-    elsif ( length($isbn) == 13 && $isbn !~ /^97[89]/ ) {
-        my $tarr = $dbh->selectall_arrayref( 'SELECT biblionumber FROM biblioitems WHERE ean = ?',
-            { Slice => {} }, $isbn );
-        if ( @{$tarr} ) {
-            return $tarr->[0];
-        }
-    }
-    else {
-        undef $search_isbn;
-        $isbn =~ s/\-//xmsg;
-        if ( $isbn =~ m/(\d{13})/xms ) {
-            my $b_isbn = Business::ISBN->new($1);
-            if ( $b_isbn && $b_isbn->is_valid ) {
-                $search_isbn = $b_isbn->as_isbn10->as_string( [] );
-            }
-
-        }
-        elsif ( $isbn =~ m/(\d{9}[xX]|\d{10})/xms ) {
-            my $b_isbn = Business::ISBN->new($1);
-            if ( $b_isbn && $b_isbn->is_valid ) {
-                $search_isbn = $b_isbn->as_isbn13->as_string( [] );
-            }
-
-        }
-        if ($search_isbn) {
-            $search_isbn = "%$search_isbn%";
-            $tuple_arr = $dbh->selectall_arrayref( $sth, { Slice => {} }, $search_isbn );
-            if ( @{$tuple_arr} ) {
-                return $tuple_arr->[0];
-            }
-        }
-    }
-    return;
 }
 
 sub _check_fund_code {
