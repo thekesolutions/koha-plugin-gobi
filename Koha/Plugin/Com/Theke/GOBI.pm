@@ -33,6 +33,7 @@ use Koha::Acquisition::Booksellers;
 use Koha::Biblios;
 use Koha::Acquisition::Currencies;
 use Koha::Items;
+use Koha::ItemTypes;
 use Koha::Libraries;
 use Koha::Number::Price;
 
@@ -253,7 +254,7 @@ sub add_order {
             quantity                   => $quantity,
             quantityreceived           => 0,
             order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
-            order_internalnote         => q{},
+            order_internalnote         => $gobi_order->selector_notes,
             sort1                      => q{},
             sort2                      => q{},
             currency                   => $currency,
@@ -412,24 +413,25 @@ sub _add_biblio {
 
     my ( $self, $record ) = @_;
 
-    # TODO: GOBI passes MARC21 records. Maybe prepare for future changes
-    my $isbn = $record->subfield( '020', 'a' );
-
     my ( $biblionumber, undef ) = AddBiblio( $record, '' );
 
     return $biblionumber;
 }
 
 sub _generate_item_data {
-    my ( $self, $gobi_order, $vendor_id, $price, $location ) = @_;
+    my ( $self, $gobi_order, $vendor_id, $price ) = @_;
+
+    my $library_id = $self->_check_library_code($gobi_order);
+    my $item_type  = $self->_check_item_type($gobi_order);
 
     my $item_data = {
         booksellerid     => $vendor_id,
         cn_source        => C4::Context->preference('DefaultClassificationSource'),
         cn_sort          => q{},
-        holdingbranch    => undef,
-        homebranch       => undef,
-        location         => $location,
+        holdingbranch    => $library_id,
+        homebranch       => $library_id,
+        itype            => $item_type,
+        location         => $gobi_order->shelving_location // "",
         notforloan       => -1,
         price            => $price,
         replacementprice => $price
@@ -515,32 +517,15 @@ sub _check_library_code {
     my ( $self, $gobi_order ) = @_;
 
     # We actually call it fund
-    my $library_code = $gobi_order->OrderDetail->{LocalData}->{Library};
+    my $library_id = $gobi_order->OrderDetail->{Location};
 
-    if ( !defined $library_code ) {
-        GOBI::Exception->throw("Missing library code.");
-    }
+    GOBI::Exception->throw("Missing library id.")
+        unless defined $library_id;
 
-    GOBI::Exception->throw("Invalid library code passed ($library_code)")
-        unless Koha::Libraries->find($library_code);
+    GOBI::Exception->throw("Invalid library code passed ($library_id)")
+        unless Koha::Libraries->find($library_id);
 
-    return $library_code;
-}
-
-sub _check_vendor_code {
-    my ( $self, $gobi_order ) = @_;
-
-    # We actually call it fund
-    my $vendor_code = $gobi_order->OrderDetail->{LocalData}->{VendorCode};
-
-    if ( !defined $vendor_code ) {
-        GOBI::Exception->throw("Missing vendor code.");
-    }
-
-    GOBI::Exception->throw("Invalid vendor code passed ($vendor_code)")
-        unless Koha::Acquisition::Booksellers->find($vendor_code);
-
-    return $vendor_code;
+    return $library_id;
 }
 
 sub _check_currency {
@@ -549,14 +534,27 @@ sub _check_currency {
     # We actually call it fund
     my $currency = $gobi_order->OrderDetail->{ListPriceCurrency};
 
-    if ( !defined $currency ) {
-        GOBI::Exception->throw("Missing currency code.");
-    }
+    GOBI::Exception->throw("Missing currency code.")
+        unless defined $currency;
 
-    GOBI::Exception->throw("Invalid vendor code passed ($currency)")
+    GOBI::Exception->throw("Invalid currency passed ($currency)")
         unless Koha::Acquisition::Currencies->find($currency);
 
     return $currency;
+}
+
+sub _check_item_type {
+    my ( $self, $gobi_order ) = @_;
+
+    my $item_type = $gobi_order->item_type;
+
+    GOBI::Exception->throw("Missing item type.")
+        unless defined $item_type;
+
+    GOBI::Exception->throw("Invalid item type passed ($item_type)")
+        unless Koha::ItemTypes->find($item_type);
+
+    return $item_type;
 }
 
 sub _table_exists {

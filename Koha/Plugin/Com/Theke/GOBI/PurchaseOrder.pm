@@ -28,7 +28,9 @@ use Koha::Plugin::Com::Theke::GOBI::Exception;
 
 use base qw(Class::Accessor);
 
-__PACKAGE__->mk_accessors(qw( record standing type CustomerDetail OrderDetail item_po_number ));
+__PACKAGE__->mk_accessors(
+    qw( record standing type CustomerDetail OrderDetail item_po_number item_type shelving_location selector_notes )
+);
 
 sub new {
 
@@ -84,9 +86,12 @@ sub _read_xml {
     #     = any { $_ eq $result->{type} } qw( ListedElectronicSerial ListedPrintSerial );
 
     # CustomerDetail
-    $result->{CustomerDetail} = _read_customer_detail($xml);
-    $result->{OrderDetail}    = _read_order_detail($xml);
-    $result->{item_po_number} = $result->{OrderDetail}->{ItemPONumber};
+    $result->{CustomerDetail}    = _read_customer_detail($xml);
+    $result->{OrderDetail}       = _read_order_detail($xml);
+    $result->{item_po_number}    = $result->{OrderDetail}->{ItemPONumber};
+    $result->{item_type}         = %{@{$result->{OrderDetail}->{LocalData}}[0]}{value};
+    $result->{shelving_location} = %{@{$result->{OrderDetail}->{LocalData}}[1]}{value};
+    $result->{selector_notes}    = %{@{$result->{OrderDetail}->{LocalData}}[2]}{value};
 
     return $result;
 }
@@ -125,8 +130,11 @@ sub _read_order_detail {
     my $LocalData;
 
     foreach my $local_data ( @{ $xml->find('//PurchaseOrder/Order//OrderDetail/LocalData') } ) {
-        $LocalData->{ @{ $local_data->find('Description') }[0]->textContent }
-            = @{ $local_data->find('Value') }[0]->textContent;
+        push @{$LocalData},
+            {
+                description => @{ $local_data->find('Description') }[0]->textContent,
+                value       => @{ $local_data->find('Value') }[0]->textContent
+            };
     }
 
     $order_detail->{ItemPONumber} = $ItemPONumber->textContent
