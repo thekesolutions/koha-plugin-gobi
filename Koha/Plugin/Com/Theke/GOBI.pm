@@ -223,7 +223,7 @@ sub add_order {
 
         # Some basic checks for data health
         my $fund_id   = $self->_check_fund_code($gobi_order);
-        # my $vendor_code  = $self->_check_vendor_code($gobi_order);
+        # GOBI has VendorCode, but we need Koha's vendor id, which we have already
         my $vendor_id = $self->retrieve_data('vendor_id');
         my $currency  = $self->_check_currency($gobi_order);
         my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
@@ -233,10 +233,10 @@ sub add_order {
         my $basket_id = C4::Acquisition::NewBasket(
             $vendor_id,             # booksellerid
             0,                      # authorisedby
-            $gobi_order->OrderDetail->{ItemPONumber},         # $basketname    TODO: MARC21 only?
+            $gobi_order->OrderDetail->{YBPOrderKey}, # $basketname
             q{},                    # $basketnote    TODO: Define what would be useful here
             q{},                    # $basketbooksellernote
-            q{}                   # $basketcontractnumber / unneeded for now
+            q{}                     # $basketcontractnumber / unneeded for now
         );
 
         # Store on the plugin table TODO: Figure what we would really need
