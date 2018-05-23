@@ -30,7 +30,7 @@ if ( major == prev_major && minor == prev_minor ) {
 
     new_version = major + '.' + minor + '.' + patch;
 } else { // Version jumped, don't increment patch
-    new_version = version;     
+    new_version = version;
 }
 
 json.previous_version = version;
