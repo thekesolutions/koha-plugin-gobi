@@ -86,12 +86,21 @@ sub _read_xml {
     #     = any { $_ eq $result->{type} } qw( ListedElectronicSerial ListedPrintSerial );
 
     # CustomerDetail
-    $result->{CustomerDetail}    = _read_customer_detail($xml);
-    $result->{OrderDetail}       = _read_order_detail($xml);
-    $result->{item_po_number}    = $result->{OrderDetail}->{ItemPONumber};
-    $result->{item_type}         = %{@{$result->{OrderDetail}->{LocalData}}[0]}{value};
-    $result->{shelving_location} = %{@{$result->{OrderDetail}->{LocalData}}[1]}{value};
-    $result->{selector_notes}    = %{@{$result->{OrderDetail}->{LocalData}}[2]}{value};
+    $result->{CustomerDetail} = _read_customer_detail($xml);
+    $result->{OrderDetail}    = _read_order_detail($xml);
+    $result->{item_po_number} = $result->{OrderDetail}->{ItemPONumber};
+    $result->{item_type}
+        = ( @{ $result->{OrderDetail}->{LocalData} }[0] )
+        ? %{ @{ $result->{OrderDetail}->{LocalData} }[0] }{value}
+        : '';
+    $result->{shelving_location}
+        = ( @{ $result->{OrderDetail}->{LocalData} }[1] )
+        ? %{ @{ $result->{OrderDetail}->{LocalData} }[1] }{value}
+        : '';
+    $result->{selector_notes}
+        = ( @{ $result->{OrderDetail}->{LocalData} }[2] )
+        ? %{ @{ $result->{OrderDetail}->{LocalData} }[2] }{value}
+        : '';
 
     return $result;
 }
