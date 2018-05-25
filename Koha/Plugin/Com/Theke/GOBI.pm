@@ -434,6 +434,7 @@ sub _generate_item_data {
 
     my $library_id = $self->_check_library_code($gobi_order);
     my $item_type  = $self->_check_item_type($gobi_order);
+    my $not_loan   = $self->retrieve_data('not_loan') // -5 ;
 
     my $item_data = {
         booksellerid     => $vendor_id,
@@ -443,7 +444,7 @@ sub _generate_item_data {
         homebranch       => $library_id,
         itype            => $item_type,
         location         => $gobi_order->shelving_location // "",
-        notforloan       => -1,
+        notforloan       => $not_loan,
         price            => $price,
         replacementprice => $price
     };
@@ -607,10 +608,12 @@ sub configure {
 
     my $api_key   = $self->retrieve_data( 'api_key' );
     my $vendor_id = $self->retrieve_data( 'vendor_id' );
+    my $not_loan  = $self->retrieve_data( 'not_loan' );
 
     $template->param(
         api_key   => $api_key,
-        vendor_id => $vendor_id
+        vendor_id => $vendor_id,
+        not_loan  => $not_loan
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -623,10 +626,12 @@ sub _configure {
     my $cgi       = $self->{cgi};
     my $api_key   = $cgi->param('api_key');
     my $vendor_id = $cgi->param('vendor_id');
+    my $not_loan  = $cgi->param('not_loan');
 
     # Store new API key
     $self->store_data({ 'api_key'   => $api_key });
     $self->store_data({ 'vendor_id' => $vendor_id });
+    $self->store_data({ 'not_loan'  => $not_loan });
 
     $self->_list_orders();
 }

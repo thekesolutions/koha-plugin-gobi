@@ -59,6 +59,10 @@
                 <span class="input-group-addon" id="vendor_id_label">GOBI vendor id</span>
                 <input type="text" class="form-control" aria-describedby="vendor_id_label" name="vendor_id" id="vendor_id" value="[% vendor_id %]" />
             </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="not_loan_label">NOT_LOAN value</span>
+                <input type="text" class="form-control" aria-describedby="not_loan_label" name="not_loan" id="not_loan" value="[% not_loan %]" />
+            </div>
             <br/>
             <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
       </form>
