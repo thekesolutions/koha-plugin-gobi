@@ -80,6 +80,7 @@ If you get a response from the api, you are on the right track.
 * Create a **GOBI vendor** in Koha. Pick the vendor id (*booksellerid* on the URL).
 * Go to the plugin configuration page. Put the *vendor id* on the **GOBI vendor id** field.
 * Generate an API key by clicking on the refresh icon.
+* Set the 'Not for loan' value to suit your needs.
 * Save.
 
 ## Configure GOBI
