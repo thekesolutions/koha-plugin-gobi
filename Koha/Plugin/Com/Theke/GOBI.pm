@@ -222,22 +222,35 @@ sub add_order {
         my $record = $gobi_order->{record};
         my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
 
+        # Electronic resources shouldn't create items
+        my $create_items = 1
+            unless  $gobi_order->type eq 'ListedElectronicMonograph' or
+                    $gobi_order->type eq 'ListedElectronicSerial';
+
         # Some basic checks for data health
         my $fund_id   = $self->_check_fund_code($gobi_order);
         # GOBI has VendorCode, but we need Koha's vendor id, which we have already
         my $vendor_id = $self->retrieve_data('vendor_id');
         my $currency  = $self->_check_currency($gobi_order);
         my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
-        my $location  = $gobi_order->OrderDetail->{Location} // q{};        # no fk
+        my $library   = $self->_check_library_code($gobi_order);
 
         # Create a basket
         my $basket_id = C4::Acquisition::NewBasket(
             $vendor_id,             # booksellerid
             0,                      # authorisedby
-            $gobi_order->OrderDetail->{YBPOrderKey}, # $basketname
-            q{},                    # $basketnote    TODO: Define what would be useful here
-            q{},                    # $basketbooksellernote
-            q{}                     # $basketcontractnumber / unneeded for now
+            $gobi_order
+              ->OrderDetail
+              ->{YBPOrderKey},      # basketname
+            q{},                    # basketnote
+            q{},                    # basketbooksellernote
+            q{},                    # basketcontractnumber
+            $library,               # deliveryplace
+            $library,               # billingplace
+            undef,                  # is_standing
+            ($create_items)
+                ? 'ordering'
+                : undef             # create_items
         );
 
         # Store on the plugin table TODO: Figure what we would really need
@@ -264,14 +277,12 @@ sub add_order {
 
         $koha_order = Koha::Acquisition::Order->new($order_data);
         $koha_order->store;
-        $koha_order->discard_changes;
+        $koha_order->discard_changes; # reload from DB
 
-        # Are we configured to generate items on ordering?
-        if ( C4::Context->preference('AcqCreateItem') eq 'ordering'
-            && $quantity > 0 )
+        if ( $create_items && $quantity > 0 )
         {
             for ( my $i = 0; $i < $quantity; $i++ ) {
-                my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price, $location );
+                my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price );
                 my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
                 push @itemnumbers, $itemnumber;
                 $koha_order->add_item($itemnumber);
