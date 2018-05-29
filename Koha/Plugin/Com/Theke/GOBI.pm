@@ -219,7 +219,6 @@ sub add_order {
         # Parse the raw purchase order
         $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($raw_gobi_order);
 
-        my $record = $gobi_order->{record};
         my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
 
         # Electronic resources shouldn't create items
@@ -257,7 +256,7 @@ sub add_order {
         $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
         # Add biblio
-        my $biblionumber = $self->_add_biblio($record);
+        my $biblionumber = $self->_add_biblio($gobi_order);
 
         my $order_data = {
             biblionumber               => $biblionumber,
@@ -422,7 +421,22 @@ sub _get_gobi_order {
 
 sub _add_biblio {
 
-    my ( $self, $record ) = @_;
+    my ( $self, $gobi_order ) = @_;
+
+    my $record    = $gobi_order->{record};
+    my $itemtype  = $self->_check_item_type($gobi_order);
+    my $field_942 = $record->field('942');
+
+    if ($field_942) {
+        # existing fields, auto-vivifies subfield if doesn't exist
+        # https://metacpan.org/pod/MARC::Field#update()
+        $field_942->update( 'c' => $itemtype );
+    }
+    else {
+        # new field
+        $field_942 = MARC::Field->new( '942', ' ', ' ', 'c' => $itemtype );
+        $record->insert_fields_ordered( $field_942 );
+    }
 
     my ( $biblionumber, undef ) = AddBiblio( $record, '' );
 
