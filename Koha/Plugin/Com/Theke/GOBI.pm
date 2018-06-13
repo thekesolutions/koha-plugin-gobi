@@ -291,8 +291,8 @@ sub add_order {
         C4::Acquisition::CloseBasket( $basket_id );
 
         $schema->storage->txn_commit;
-        # All good, return biblionumber
-        return $biblionumber;
+        # All good, return ordernumber
+        return $koha_order->ordernumber;
     }
     catch {
         # Problem found, rollback transaction, notify error

@@ -58,12 +58,12 @@ else {
     }
 
     try {
-        my $biblionumber = $gobi->add_order( $raw_gobi_order );
-        unless ( $biblionumber ) {
+        my $order_id = $gobi->add_order( $raw_gobi_order );
+        unless ( $order_id ) {
             GOBI::Exception->throw('No order generated.');
         }
         $gobi->response_success({
-            order_id => $biblionumber,
+            order_id => $order_id,
         });
     }
     catch {
