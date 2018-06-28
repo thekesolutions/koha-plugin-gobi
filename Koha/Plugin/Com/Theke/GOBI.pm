@@ -223,8 +223,7 @@ sub add_order {
 
         # Electronic resources shouldn't create items
         my $create_items = 1
-            unless  $gobi_order->type eq 'ListedElectronicMonograph' or
-                    $gobi_order->type eq 'ListedElectronicSerial';
+            unless  $gobi_order->is_electronic;
 
         # Some basic checks for data health
         my $fund_id   = $self->_check_fund_code($gobi_order);
@@ -427,14 +426,22 @@ sub _add_biblio {
     my $itemtype  = $self->_check_item_type($gobi_order);
     my $field_942 = $record->field('942');
 
+    my @subfields;
+    push @subfields, 'c' => $itemtype;
+
+    if ( $gobi_order->is_electronic ) {
+        # is electronic, suppress
+        push @subfields, 'n' => '1';
+    }
+
     if ($field_942) {
         # existing fields, auto-vivifies subfield if doesn't exist
         # https://metacpan.org/pod/MARC::Field#update()
-        $field_942->update( 'c' => $itemtype );
+        $field_942->update( @subfields );
     }
     else {
         # new field
-        $field_942 = MARC::Field->new( '942', ' ', ' ', 'c' => $itemtype );
+        $field_942 = MARC::Field->new( '942', ' ', ' ', @subfields );
         $record->insert_fields_ordered( $field_942 );
     }
 

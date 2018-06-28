@@ -29,7 +29,7 @@ use Koha::Plugin::Com::Theke::GOBI::Exception;
 use base qw(Class::Accessor);
 
 __PACKAGE__->mk_accessors(
-    qw( record standing type CustomerDetail OrderDetail item_po_number item_type shelving_location selector_notes )
+    qw( record standing type is_electronic CustomerDetail OrderDetail item_po_number item_type shelving_location selector_notes )
 );
 
 sub new {
@@ -101,6 +101,14 @@ sub _read_xml {
         = ( @{ $result->{OrderDetail}->{LocalData} }[2] )
         ? %{ @{ $result->{OrderDetail}->{LocalData} }[2] }{value}
         : '';
+
+    if ( $result->{type} eq 'ListedElectronicMonograph' or
+         $result->{type} eq 'ListedElectronicSerial' ) {
+        $result->{is_electronic} = 1;
+    }
+    else {
+        $result->{is_electronic} = 0;
+    }
 
     return $result;
 }
