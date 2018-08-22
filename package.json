@@ -1,6 +1,6 @@
 {
   "name": "koha-plugin-gobi",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "previous_version": "1.2.0",
   "description": "Koha GOBI plugin",
   "devDependencies": {
