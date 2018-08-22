@@ -63,6 +63,54 @@
                 <span class="input-group-addon" id="not_loan_label">NOT_LOAN value</span>
                 <input type="text" class="form-control" aria-describedby="not_loan_label" name="not_loan" id="not_loan" value="[% not_loan %]" />
             </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="lpm_sort1_label">Listed print monograph (sort1)</span>
+                <input type="text" class="form-control" aria-describedby="lpm_sort1_label" name="lpm_sort1" id="lpm_sort1" value="[% lpm_sort1 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="lpm_sort2_label">Listed print monograph (sort2)</span>
+                <input type="text" class="form-control" aria-describedby="lpm_sort2_label" name="lpm_sort2" id="lpm_sort2" value="[% lpm_sort2 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="upm_sort1_label">Unlisted print monograph (sort1)</span>
+                <input type="text" class="form-control" aria-describedby="upm_sort1_label" name="upm_sort1" id="upm_sort1" value="[% upm_sort1 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="upm_sort2_label">Unlisted print monograph (sort2)</span>
+                <input type="text" class="form-control" aria-describedby="upm_sort2_label" name="upm_sort2" id="upm_sort2" value="[% upm_sort2 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="lps_sort1_label">Listed print serial (sort1)</span>
+                <input type="text" class="form-control" aria-describedby="lps_sort1_label" name="lps_sort1" id="lps_sort1" value="[% lps_sort1 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="lps_sort2_label">Listed print serial (sort2)</span>
+                <input type="text" class="form-control" aria-describedby="lps_sort2_label" name="lps_sort2" id="lps_sort2" value="[% lps_sort2 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="ups_sort1_label">Unlisted print serial (sort1)</span>
+                <input type="text" class="form-control" aria-describedby="ups_sort1_label" name="ups_sort1" id="ups_sort1" value="[% ups_sort1 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="ups_sort2_label">Unlisted print serial (sort2)</span>
+                <input type="text" class="form-control" aria-describedby="ups_sort2_label" name="ups_sort2" id="ups_sort2" value="[% ups_sort2 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="lem_sort1_label">Listed electronic monograph (sort1)</span>
+                <input type="text" class="form-control" aria-describedby="lem_sort1_label" name="lem_sort1" id="lem_sort1" value="[% lem_sort1 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="lem_sort2_label">Listed electronic monograph (sort2)</span>
+                <input type="text" class="form-control" aria-describedby="lem_sort2_label" name="lem_sort2" id="lem_sort2" value="[% lem_sort2 %]" />
+            </div>
+             <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="les_sort1_label">Listed electronic serial (sort1)</span>
+                <input type="text" class="form-control" aria-describedby="les_sort1_label" name="les_sort1" id="les_sort1" value="[% les_sort1 %]" />
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="les_sort2_label">Listed electronic serial (sort2)</span>
+                <input type="text" class="form-control" aria-describedby="les_sort2_label" name="les_sort2" id="les_sort2" value="[% les_sort2 %]" />
+            </div>
             <br/>
             <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
       </form>

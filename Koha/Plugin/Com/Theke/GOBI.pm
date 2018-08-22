@@ -266,8 +266,8 @@ sub add_order {
             quantityreceived           => 0,
             order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
             order_internalnote         => $gobi_order->selector_notes,
-            sort1                      => q{},
-            sort2                      => q{},
+            sort1                      => $self->order_type_to_sort_value( $gobi_order, 'sort1' ),
+            sort2                      => $self->order_type_to_sort_value( $gobi_order, 'sort2' ),
             currency                   => $currency,
             suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
         };
@@ -627,14 +627,38 @@ sub configure {
 
     my $template = $self->get_template({ file => 'configure.tt' });
 
-    my $api_key   = $self->retrieve_data( 'api_key' );
+    my $api_key   = $self->retrieve_data( 'api_key'   );
     my $vendor_id = $self->retrieve_data( 'vendor_id' );
-    my $not_loan  = $self->retrieve_data( 'not_loan' );
+    my $not_loan  = $self->retrieve_data( 'not_loan'  );
+    my $lpm_sort1 = $self->retrieve_data( 'lpm_sort1' );
+    my $lpm_sort2 = $self->retrieve_data( 'lpm_sort2' );
+    my $upm_sort1 = $self->retrieve_data( 'upm_sort1' );
+    my $upm_sort2 = $self->retrieve_data( 'upm_sort2' );
+    my $lps_sort1 = $self->retrieve_data( 'lps_sort1' );
+    my $lps_sort2 = $self->retrieve_data( 'lps_sort2' );
+    my $ups_sort1 = $self->retrieve_data( 'ups_sort1' );
+    my $ups_sort2 = $self->retrieve_data( 'ups_sort2' );
+    my $lem_sort1 = $self->retrieve_data( 'lem_sort1' );
+    my $lem_sort2 = $self->retrieve_data( 'lem_sort2' );
+    my $les_sort1 = $self->retrieve_data( 'les_sort1' );
+    my $les_sort2 = $self->retrieve_data( 'les_sort2' );
 
     $template->param(
         api_key   => $api_key,
         vendor_id => $vendor_id,
-        not_loan  => $not_loan
+        not_loan  => $not_loan,
+        lpm_sort1 => $lpm_sort1,
+        lpm_sort2 => $lpm_sort2,
+        upm_sort1 => $upm_sort1,
+        upm_sort2 => $upm_sort2,
+        lps_sort1 => $lps_sort1,
+        lps_sort2 => $lps_sort2,
+        ups_sort1 => $ups_sort1,
+        ups_sort2 => $ups_sort2,
+        lem_sort1 => $lem_sort1,
+        lem_sort2 => $lem_sort2,
+        les_sort1 => $les_sort1,
+        les_sort2 => $les_sort2,
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -649,12 +673,58 @@ sub _configure {
     my $vendor_id = $cgi->param('vendor_id');
     my $not_loan  = $cgi->param('not_loan');
 
+    my $lpm_sort1 = $cgi->param('lpm_sort1') // q{};
+    my $lpm_sort2 = $cgi->param('lpm_sort2') // q{};
+    my $upm_sort1 = $cgi->param('upm_sort1') // q{};
+    my $upm_sort2 = $cgi->param('upm_sort2') // q{};
+    my $lps_sort1 = $cgi->param('lps_sort1') // q{};
+    my $lps_sort2 = $cgi->param('lps_sort2') // q{};
+    my $ups_sort1 = $cgi->param('ups_sort1') // q{};
+    my $ups_sort2 = $cgi->param('ups_sort2') // q{};
+    my $lem_sort1 = $cgi->param('lem_sort1') // q{};
+    my $lem_sort2 = $cgi->param('lem_sort2') // q{};
+    my $les_sort1 = $cgi->param('les_sort1') // q{};
+    my $les_sort2 = $cgi->param('les_sort2') // q{};
+
     # Store new API key
-    $self->store_data({ 'api_key'   => $api_key });
+    $self->store_data({ 'api_key'   => $api_key   });
     $self->store_data({ 'vendor_id' => $vendor_id });
-    $self->store_data({ 'not_loan'  => $not_loan });
+    $self->store_data({ 'not_loan'  => $not_loan  });
+    $self->store_data({ 'lpm_sort1' => $lpm_sort1 });
+    $self->store_data({ 'lpm_sort2' => $lpm_sort2 });
+    $self->store_data({ 'upm_sort1' => $upm_sort1 });
+    $self->store_data({ 'upm_sort2' => $upm_sort2 });
+    $self->store_data({ 'lps_sort1' => $lps_sort1 });
+    $self->store_data({ 'lps_sort2' => $lps_sort2 });
+    $self->store_data({ 'ups_sort1' => $ups_sort1 });
+    $self->store_data({ 'ups_sort2' => $ups_sort2 });
+    $self->store_data({ 'lem_sort1' => $lem_sort1 });
+    $self->store_data({ 'lem_sort2' => $lem_sort2 });
+    $self->store_data({ 'les_sort1' => $les_sort1 });
+    $self->store_data({ 'les_sort2' => $les_sort2 });
 
     $self->_list_orders();
+}
+
+sub order_type_to_sort_value {
+    my ( $self, $order, $sort ) = @_;
+
+    my $sort_mapping = {
+        ListedPrintMonograph      => 'lpm',
+        UnlinstedPrintMonograph   => 'upm',
+        ListedPrintSerial         => 'lps',
+        UnlinstedPrintSerial      => 'ups',
+        ListedElectronicMonograph => 'lem',
+        ListedElectronicSerial    => 'les'
+    };
+
+    die "Invalid order type " . $order->type
+        unless exists $sort_mapping->{ $order->type };
+
+    my $variable = $sort_mapping->{ $order->type } . "_$sort";
+    my $value    = $self->retrieve_data( $variable ) // q{};
+
+    return $value;
 }
 
 sub uninstall {
