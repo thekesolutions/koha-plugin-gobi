@@ -5,7 +5,7 @@
   "description": "Koha GOBI plugin",
   "devDependencies": {
     "gulp": "^4.0.0",
-    "gulp-cli": "^2.0.1",
+    "gulp-cli": "^2.1.0",
     "gulp-github-release": "^1.2.1",
     "gulp-run": "^1.7.1"
   },
@@ -24,7 +24,7 @@
   "homepage": "https://github.com/thekesolutions/koha-plugin-gobi#readme",
   "dependencies": {
     "datetime": "0.0.3",
-    "jsonfile": "^4.0.0",
-    "node-datetime": "^2.0.6"
+    "jsonfile": "^5.0.0",
+    "node-datetime": "^2.1.2"
   }
 }

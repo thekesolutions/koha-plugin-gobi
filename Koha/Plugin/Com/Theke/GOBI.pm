@@ -601,26 +601,6 @@ sub _table_exists {
     return 0;
 }
 
-sub install {
-    my ( $self, $args ) = @_;
-
-    my $po_table = $self->get_qualified_table_name('purchase_orders');
-
-    C4::Context->dbh->do("
-        CREATE TABLE $po_table (
-          `id` INT(11) NOT NULL auto_increment,
-          `status` TEXT,
-          `basketno` INT(11) REFERENCES aqbasket( basketno),
-          `raw_msg` MEDIUMTEXT,
-          PRIMARY KEY  (id),
-          KEY basketno ( basketno),
-          CONSTRAINT gobipo_basketno FOREIGN KEY ( basketno ) REFERENCES aqbasket ( basketno ) ON DELETE CASCADE ON UPDATE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-    ") unless $self->_table_exists($po_table);
-
-    return 1;
-}
-
 sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
@@ -725,6 +705,48 @@ sub order_type_to_sort_value {
     my $value    = $self->retrieve_data( $variable ) // q{};
 
     return $value;
+}
+
+sub install {
+    my ( $self, $args ) = @_;
+
+    my $po_table = $self->get_qualified_table_name('purchase_orders');
+
+    C4::Context->dbh->do("
+        CREATE TABLE $po_table (
+          `id` INT(11) NOT NULL auto_increment,
+          `status` TEXT,
+          `basketno` INT(11) REFERENCES aqbasket( basketno),
+          `raw_msg` MEDIUMTEXT,
+          `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY  (id),
+          KEY basketno ( basketno),
+          CONSTRAINT gobipo_basketno FOREIGN KEY ( basketno ) REFERENCES aqbasket ( basketno ) ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+    ") unless $self->_table_exists($po_table);
+
+    return 1;
+}
+
+sub upgrade {
+    my ( $self, $args ) = @_;
+
+    my $database_version = $self->retrieve_data('__INSTALLED_VERSION__') || 0;
+
+    if ( $self->_version_compare( $database_version, "1.3.0" ) == -1 ) {
+
+        my $po_table = $self->get_qualified_table_name('purchase_orders');
+
+        C4::Context->dbh->do(qq{
+            ALTER TABLE $po_table
+                ADD COLUMN `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                AFTER `raw_msg`;
+        });
+
+        $self->store_data({ '__INSTALLED_VERSION__' => "1.3.0" });
+    }
+
+    return 1;
 }
 
 sub uninstall {
