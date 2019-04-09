@@ -229,6 +229,11 @@ sub add_order {
         my $fund_id   = $self->_check_fund_code($gobi_order);
         # GOBI has VendorCode, but we need Koha's vendor id, which we have already
         my $vendor_id = $self->retrieve_data('vendor_id');
+        my $vendor = Koha::Acquisition::Booksellers->find( $vendor_id );
+        unless ( $vendor ) {
+            GOBI::Exception->throw( error => "Invalid configuration (vendor_id)" );
+        }
+
         my $currency  = $self->_check_currency($gobi_order);
         my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
         my $library   = $self->_check_library_code($gobi_order);
