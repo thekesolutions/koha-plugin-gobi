@@ -48,6 +48,7 @@
       <table class="table gobi">
         <thead>
           <tr>
+            <th>Timestamp</th>
             <th>ID</th>
             <th>ItemPONumber</th>
             <th>Status</th>
@@ -58,6 +59,7 @@
         <tbody>
       [% FOREACH gobi_order IN gobi_orders %]
           <tr>
+            <td>[% gobi_order.timestamp %]</td>
             <td><a href="?class=[% CLASS %]&method=[% METHOD %]&step=get&gobi_order_id=[% gobi_order.id %]">[% gobi_order.id %]</a></td>
             <td>[% gobi_order.item_po_number %]</td>
             <td>[% gobi_order.status %]</td>
