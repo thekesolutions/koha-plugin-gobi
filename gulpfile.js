@@ -20,7 +20,7 @@ console.log(release_filename);
 console.log(pm_file_path_full_dist);
 
 gulp.task('build', () => {
-    run(`
+    return run(`
         mkdir dist ;
         cp -r Koha dist/. ;
         sed -i -e "s/{VERSION}/${package_json.version}/g" ${pm_file_path_full_dist} ;
@@ -30,11 +30,10 @@ gulp.task('build', () => {
         cd .. ;
         rm -rf dist ;
     `).exec();
-
 });
 
 gulp.task('release', () => {
-    gulp.src(release_filename)
+    return gulp.src(release_filename)
         .pipe(release({
             manifest: require('./package.json') // package.json from which default values will be extracted if they're missing
         }));
