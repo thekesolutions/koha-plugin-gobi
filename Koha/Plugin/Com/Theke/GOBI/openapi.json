@@ -1,0 +1,35 @@
+{
+  "/gobi/orders": {
+    "post": {
+      "x-mojo-to": "Com::Theke::GOBI::Controller#add_order",
+      "operationId": "add_order",
+      "tags": ["orders"],
+      "parameters": [
+        {
+          "description": "API Key",
+          "in": "query",
+          "name": "api_key",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "produces": [
+        "text/xml"
+      ],
+      "responses": {
+        "200": {
+          "description": "An order id"
+        },
+        "400": {
+          "description": "Bad request"
+        },
+        "403": {
+          "description": "Permission denied"
+        },
+        "500": {
+          "description": "Internal server error"
+        }
+      }
+    }
+  }
+}
