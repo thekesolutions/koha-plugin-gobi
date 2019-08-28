@@ -1,30 +1,31 @@
 {
   "name": "koha-plugin-gobi",
   "version": "1.3.1",
-  "previous_version": "1.3.0",
   "description": "Koha GOBI plugin",
   "devDependencies": {
-    "gulp": "^4.0.0",
-    "gulp-cli": "^2.1.0",
-    "gulp-github-release": "^1.2.1",
+    "gulp": "^3.9.1",
+    "gulp-cli": "^1.2.2",
+    "gulp-github-release": "^1.1.5",
     "gulp-run": "^1.7.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "kpz": "echo -n ${npm_package_name}-v${npm_package_version}.kpz",
+    "name": "echo -n ${npm_package_name}"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thekesolutions/koha-plugin-gobi.git"
+    "url": "git+https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi.git"
   },
-  "author": "Tomas Cohen Arazi <tomascohen@theke.io>",
+  "author": "Tomás Cohen Arazi <tomascohen@theke.io>",
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/thekesolutions/koha-plugin-gobi/issues"
+    "url": "https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi/issues"
   },
-  "homepage": "https://github.com/thekesolutions/koha-plugin-gobi#readme",
+  "homepage": "https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi",
   "dependencies": {
     "datetime": "0.0.3",
-    "jsonfile": "^5.0.0",
-    "node-datetime": "^2.1.2"
+    "jsonfile": "^4.0.0",
+    "node-datetime": "^2.0.0"
   }
 }
