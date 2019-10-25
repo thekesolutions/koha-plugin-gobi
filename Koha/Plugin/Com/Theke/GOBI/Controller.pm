@@ -22,6 +22,8 @@ use Koha::Plugin::Com::Theke::GOBI::Exception;
 
 use Mojo::Base 'Mojolicious::Controller';
 
+use Try::Tiny;
+
 =head1 Koha::Plugin::Com::Theke::GOBI::Controller
 
 A class implementing the controller code for GOBI requests
@@ -44,7 +46,7 @@ sub add_order {
     if ( !defined $api_key ) {
         $c->render(
             status => 400,
-            xml    => $c->render_response({
+            text   => $c->render_response({
                 error   => 1,
                 code    => 'API_KEY_MISSING',
                 message => "API Key parameter missing on request."
@@ -56,20 +58,21 @@ sub add_order {
     if ( !$gobi->api_key_valid($api_key) ) {
         $c->render(
             status => 403,
-            xml    => $c->render_response({
+            text   => $c->render_response({
                 error   => 1,
                 code    => 'API_KEY_INVALID',
-                message => "The API Key \"$api_key\" is an Invalid API Key."
+                message => "The API Key \"$api_key\" is an invalid."
             })
         );
     }else {
 
         # Ok, passed, moving on!
-        my $body = $c->validation->param('body');
+        my $body = $c->req->body;
+
         if ( !defined $body ) {
             $c->render(
-                status => 403,
-                xml    => $c->render_response(
+                status => 200,
+                text   => $c->render_response(
                     {
                         error   => 1,
                         code    => 'ORDER_DATA_MISSING',
@@ -86,17 +89,17 @@ sub add_order {
             }
             $c->render(
                 status => 200,
-                xml    => $c->render_response({ order_id => $order_id })
+                text   => $c->render_response({ order_id => $order_id })
             );
         }
         catch {
 
-            $c->render(
-                status => 500,
-                xml    => $c->render_response({
-                    error => 1,
-                    code  => 'REQUEST_PROCESSING_ERROR',
-                    description => $_->error
+            return $c->render(
+                status => 200,
+                text   => $c->render_response({
+                    error   => 1,
+                    code    => 'REQUEST_PROCESSING_ERROR',
+                    message => "$_"
                 })
             );
         };
@@ -112,7 +115,7 @@ Internal method that generates the XML string representing a response
 =cut
 
 sub render_response {
-    my ($args) = @_;
+    my ($c, $args) = @_;
 
     my $code     = $args->{code} // '';
     my $message  = $args->{message} // '';
@@ -129,7 +132,7 @@ sub render_response {
 <Response>
     <Error>
         <Code>$code</Code>
-        <Message>$messages</Message>
+        <Message>$message</Message>
     </Error>
 </Response>};
     }

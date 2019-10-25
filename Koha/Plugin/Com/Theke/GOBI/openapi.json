@@ -1,5 +1,5 @@
 {
-  "/gobi/orders": {
+  "/orders": {
     "post": {
       "x-mojo-to": "Com::Theke::GOBI::Controller#add_order",
       "operationId": "add_order",
@@ -13,8 +13,11 @@
           "type": "string"
         }
       ],
+      "consumes": [
+        "application/xml"
+      ],
       "produces": [
-        "text/xml"
+        "application/xml"
       ],
       "responses": {
         "200": {

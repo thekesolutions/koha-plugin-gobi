@@ -40,6 +40,7 @@ use Koha::Number::Price;
 use Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
 use Koha::Plugin::Com::Theke::GOBI::Exception;
 
+use Mojo::JSON qw(decode_json);
 use Try::Tiny;
 
 use MARC::Record;
@@ -752,6 +753,21 @@ sub upgrade {
     }
 
     return 1;
+}
+
+sub api_routes {
+    my ( $self, $args ) = @_;
+
+    my $spec_str = $self->mbf_read('openapi.json');
+    my $spec     = decode_json($spec_str);
+
+    return $spec;
+}
+
+sub api_namespace {
+    my ($self) = @_;
+
+    return 'gobi';
 }
 
 sub uninstall {
