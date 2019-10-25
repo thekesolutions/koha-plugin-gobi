@@ -40,7 +40,32 @@ $ sudo systemctl restart koha-common.service
 Once set up is complete you will need to alter your UseKohaPlugins system preference. On the Tools page you will
 see the Tools Plugins.
 
-Download the .kpz file from the [releases page](https://github.com/thekesolutions/koha-plugin-gobi/releases).
+Download the .kpz file from the [releases page](https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi/-/releases).
+Then upload the _kpz_ file in the plugins administration page.
+
+Then restart _koha-common_ again:
+```
+$ sudo systemctl restart koha-common.service
+```
+
+You can test it is accessible using _curl_ like this from the command line:
+```
+vagrant@kohadevbox:~$ curl http://localhost:8080/api/v1/gobi/orders
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Error>
+        <Code>API_KEY_MISSING</Code>
+        <Message>API Key parameter missing on request.</Message>
+    </Error>
+</Response>
+```
+
+If you get a response from the api, you are on the right track.
+
+### Deprecated setup
+
+If your Koha is too old (prior to 18.11), you need to upgrade it :-D But you can still set the old
+CGI script for GOBI:
 
 You need to tweak your _Apache_ vhost configuration for the intranet. If you are using the packages
 install method (you should!) given the instance name **instance** you need to edit the
@@ -54,26 +79,13 @@ Alias /plugin "/var/lib/koha/instance/plugins"
       AllowOverride None
       Require all granted
 </Directory>
+Then restart _koha-common_ again:
 ```
 
 Then restart _apache_:
 ```
 $ sudo systemctl restart apache2.service
 ```
-
-You can test it is accessible using _curl_ like this from the command line:
-```
-vagrant@kohadevbox:~$ curl http://localhost:8080/gobi
-<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Error>
-        <Code>API_KEY_MISSING</Code>
-        <Message>API Key parameter missing on request.</Message>
-    </Error>
-</Response>
-```
-
-If you get a response from the api, you are on the right track.
 
 ## Configure the plugin
 
