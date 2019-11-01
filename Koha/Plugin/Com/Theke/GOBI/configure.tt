@@ -111,6 +111,13 @@
                 <span class="input-group-addon" id="les_sort2_label">Listed electronic serial (sort2)</span>
                 <input type="text" class="form-control" aria-describedby="les_sort2_label" name="les_sort2" id="les_sort2" value="[% les_sort2 %]" />
             </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="create_item_for_electronic_resources_label">Create items for electronic resources</span>
+                <select class="form-control" aria-describedby="create_item_for_electronic_resources_label" name="create_item_for_electronic_resources" id="create_item_for_electronic_resources">
+                  <option value="1" [% IF create_item_for_electronic_resources %]selected[% END %]>Yes</option>
+                  <option value="0" [% IF !create_item_for_electronic_resources %]selected[% END %]>No</option>
+                </select>
+            </div>
             <br/>
             <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
       </form>

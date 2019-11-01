@@ -222,9 +222,11 @@ sub add_order {
 
         my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
 
-        # Electronic resources shouldn't create items
-        my $create_items = 1
-            unless  $gobi_order->is_electronic;
+        # Should Electronic resources create items?
+        my  $create_item_for_electronic_resources = $self->retrieve_data('create_item_for_electronic_resources');
+        my $create_items = (!$create_item_for_electronic_resources and $gobi_order->is_electronic)
+                                ? 0
+                                : 1;
 
         # Some basic checks for data health
         my $fund_id   = $self->_check_fund_code($gobi_order);
@@ -628,6 +630,7 @@ sub configure {
     my $lem_sort2 = $self->retrieve_data( 'lem_sort2' );
     my $les_sort1 = $self->retrieve_data( 'les_sort1' );
     my $les_sort2 = $self->retrieve_data( 'les_sort2' );
+    my $create_item_for_electronic_resources = $self->retrieve_data( 'create_item_for_electronic_resources' );
 
     $template->param(
         api_key   => $api_key,
@@ -645,6 +648,7 @@ sub configure {
         lem_sort2 => $lem_sort2,
         les_sort1 => $les_sort1,
         les_sort2 => $les_sort2,
+        create_item_for_electronic_resources => $create_item_for_electronic_resources
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -671,6 +675,8 @@ sub _configure {
     my $lem_sort2 = $cgi->param('lem_sort2') // q{};
     my $les_sort1 = $cgi->param('les_sort1') // q{};
     my $les_sort2 = $cgi->param('les_sort2') // q{};
+    my $create_item_for_electronic_resources = $cgi->param('create_item_for_electronic_resources') // 0;
+
 
     # Store new API key
     $self->store_data({ 'api_key'   => $api_key   });
@@ -688,6 +694,7 @@ sub _configure {
     $self->store_data({ 'lem_sort2' => $lem_sort2 });
     $self->store_data({ 'les_sort1' => $les_sort1 });
     $self->store_data({ 'les_sort2' => $les_sort2 });
+    $self->store_data({ 'create_item_for_electronic_resources' => $create_item_for_electronic_resources });
 
     $self->_list_orders();
 }
@@ -750,6 +757,14 @@ sub upgrade {
         });
 
         $self->store_data({ '__INSTALLED_VERSION__' => "1.3.0" });
+    }
+
+    if ( $self->_version_compare( $database_version, "2.0.1" ) == -1 ) {
+
+        # Keep current behavior by default
+        $self->store_data( { 'create_item_for_electronic_resources' => 0 } );
+
+        $self->store_data( { '__INSTALLED_VERSION__' => "2.0.1" } );
     }
 
     return 1;
