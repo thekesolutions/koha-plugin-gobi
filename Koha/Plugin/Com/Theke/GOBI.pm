@@ -472,11 +472,14 @@ sub _generate_item_data {
         holdingbranch    => $library_id,
         homebranch       => $library_id,
         itype            => $item_type,
-        location         => $gobi_order->shelving_location // "",
+        location         => $gobi_order->shelving_location // q{},
         notforloan       => $not_loan,
         price            => $price,
         replacementprice => $price
     };
+
+    $item_data->{itemnotes_nonpublic} = $gobi_order->selector_notes // q{}
+        if $self->retrieve_data( 'add_nonpublic_item_notes' );
 
     return $item_data;
 }
