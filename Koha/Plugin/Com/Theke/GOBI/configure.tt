@@ -118,6 +118,13 @@
                   <option value="0" [% IF !create_item_for_electronic_resources %]selected[% END %]>No</option>
                 </select>
             </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="add_nonpublic_item_notes_label">Create items for electronic resources</span>
+                <select class="form-control" aria-describedby="add_nonpublic_item_notes_label" name="add_nonpublic_item_notes" id="add_nonpublic_item_notes">
+                  <option value="1" [% IF add_nonpublic_item_notes %]selected[% END %]>Yes</option>
+                  <option value="0" [% IF !add_nonpublic_item_notes %]selected[% END %]>No</option>
+                </select>
+            </div>
             <br/>
             <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
       </form>

@@ -631,6 +631,7 @@ sub configure {
     my $les_sort1 = $self->retrieve_data( 'les_sort1' );
     my $les_sort2 = $self->retrieve_data( 'les_sort2' );
     my $create_item_for_electronic_resources = $self->retrieve_data( 'create_item_for_electronic_resources' );
+    my $add_nonpublic_item_notes = $self->retrieve_data( 'add_nonpublic_item_notes' );
 
     $template->param(
         api_key   => $api_key,
@@ -648,7 +649,8 @@ sub configure {
         lem_sort2 => $lem_sort2,
         les_sort1 => $les_sort1,
         les_sort2 => $les_sort2,
-        create_item_for_electronic_resources => $create_item_for_electronic_resources
+        create_item_for_electronic_resources => $create_item_for_electronic_resources,
+        add_nonpublic_item_notes => $add_nonpublic_item_notes
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -676,6 +678,7 @@ sub _configure {
     my $les_sort1 = $cgi->param('les_sort1') // q{};
     my $les_sort2 = $cgi->param('les_sort2') // q{};
     my $create_item_for_electronic_resources = $cgi->param('create_item_for_electronic_resources') // 0;
+    my $add_nonpublic_item_notes = $cgi->param('add_nonpublic_item_notes') // 0;
 
 
     # Store new API key
@@ -695,6 +698,7 @@ sub _configure {
     $self->store_data({ 'les_sort1' => $les_sort1 });
     $self->store_data({ 'les_sort2' => $les_sort2 });
     $self->store_data({ 'create_item_for_electronic_resources' => $create_item_for_electronic_resources });
+    $self->store_data({ 'add_nonpublic_item_notes' => $add_nonpublic_item_notes });
 
     $self->_list_orders();
 }
@@ -765,6 +769,14 @@ sub upgrade {
         $self->store_data( { 'create_item_for_electronic_resources' => 0 } );
 
         $self->store_data( { '__INSTALLED_VERSION__' => "2.0.1" } );
+    }
+
+    if ( $self->_version_compare( $database_version, "2.0.2" ) == -1 ) {
+
+        # Keep current behavior by default
+        $self->store_data( { 'add_nonpublic_item_notes' => 0 } );
+
+        $self->store_data( { '__INSTALLED_VERSION__' => "2.0.2" } );
     }
 
     return 1;
