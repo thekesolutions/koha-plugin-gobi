@@ -71,7 +71,7 @@ sub add_order {
 
         if ( !defined $body ) {
             $c->render(
-                status => 200,
+                status => 400,
                 text   => $c->render_response(
                     {
                         error   => 1,
@@ -95,7 +95,7 @@ sub add_order {
         catch {
 
             return $c->render(
-                status => 200,
+                status => 400,
                 text   => $c->render_response({
                     error   => 1,
                     code    => 'REQUEST_PROCESSING_ERROR',
