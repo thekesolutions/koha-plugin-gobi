@@ -230,12 +230,22 @@ sub add_order {
 
         # Some basic checks for data health
         my $fund_id   = $self->_check_fund_code($gobi_order);
+
+        my $patron_id = $self->retrieve_data('patron_id');
+        my $patron    = Koha::Patrons->find($patron_id);
+        GOBI::Exception->throw( error => "Invalid configuration (patron_id)" )
+            unless $patron;
+
+        # There are side effects in AddBiblio and Koha::Acquisition::Order->store
+        # that will read the 'number' param in userenv to set the biblio and order creator.
+        # It can be passed explicitly in $order->store, but not in AddBiblio.
+        C4::Context->set_userenv( $patron_id );
+
         # GOBI has VendorCode, but we need Koha's vendor id, which we have already
         my $vendor_id = $self->retrieve_data('vendor_id');
         my $vendor = Koha::Acquisition::Booksellers->find( $vendor_id );
-        unless ( $vendor ) {
-            GOBI::Exception->throw( error => "Invalid configuration (vendor_id)" );
-        }
+        GOBI::Exception->throw( error => "Invalid configuration (vendor_id)" )
+            unless $vendor;
 
         my $currency  = $self->_check_currency($gobi_order);
         my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
@@ -244,7 +254,7 @@ sub add_order {
         # Create a basket
         my $basket_id = C4::Acquisition::NewBasket(
             $vendor_id,             # booksellerid
-            0,                      # authorisedby
+            $patron_id,             # authorisedby
             $gobi_order
               ->OrderDetail
               ->{YBPOrderKey},      # basketname
@@ -268,6 +278,7 @@ sub add_order {
         my $order_data = {
             biblionumber               => $biblionumber,
             basketno                   => $basket_id,
+            created_by                 => $patron_id,
             budget_id                  => $fund_id,
             listprice                  => $price,
             quantity                   => $quantity,
@@ -621,6 +632,7 @@ sub configure {
 
     my $api_key   = $self->retrieve_data( 'api_key'   );
     my $vendor_id = $self->retrieve_data( 'vendor_id' );
+    my $patron_id = $self->retrieve_data( 'patron_id' );
     my $not_loan  = $self->retrieve_data( 'not_loan'  );
     my $lpm_sort1 = $self->retrieve_data( 'lpm_sort1' );
     my $lpm_sort2 = $self->retrieve_data( 'lpm_sort2' );
@@ -640,6 +652,7 @@ sub configure {
     $template->param(
         api_key   => $api_key,
         vendor_id => $vendor_id,
+        patron_id => $patron_id,
         not_loan  => $not_loan,
         lpm_sort1 => $lpm_sort1,
         lpm_sort2 => $lpm_sort2,
@@ -667,6 +680,7 @@ sub _configure {
     my $cgi       = $self->{cgi};
     my $api_key   = $cgi->param('api_key');
     my $vendor_id = $cgi->param('vendor_id');
+    my $patron_id = $cgi->param('patron_id');
     my $not_loan  = $cgi->param('not_loan');
 
     my $lpm_sort1 = $cgi->param('lpm_sort1') // q{};
@@ -688,6 +702,7 @@ sub _configure {
     # Store new API key
     $self->store_data({ 'api_key'   => $api_key   });
     $self->store_data({ 'vendor_id' => $vendor_id });
+    $self->store_data({ 'patron_id' => $patron_id });
     $self->store_data({ 'not_loan'  => $not_loan  });
     $self->store_data({ 'lpm_sort1' => $lpm_sort1 });
     $self->store_data({ 'lpm_sort2' => $lpm_sort2 });
