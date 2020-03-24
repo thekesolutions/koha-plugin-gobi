@@ -53,7 +53,7 @@ our $metadata = {
     author          => 'Tomas Cohen Arazi',
     description     => 'Integrates GOBI with Koha',
     date_authored   => '2017-05-10',
-    date_updated    => '2018-04-26',
+    date_updated    => '2020-03-24',
     minimum_version => '17.0500000',
     maximum_version => undef,
     version         => $VERSION,
@@ -495,10 +495,11 @@ sub _add_price_data {
 
     # Get tax and discounts info from the vendor
     my $tax_rate = $bookseller->tax_rate;
-    my $discount = $bookseller->discount / 100;
+    my $discount = $bookseller->discount // 0;
+    my $THE_discount = $discount / 100;
 
     $order_data->{tax_rate} = $tax_rate;
-    $order_data->{discount} = $discount;
+    $order_data->{discount} = $THE_discount;
 
     if ($price) {
         if ( $bookseller->listincgst ) {
