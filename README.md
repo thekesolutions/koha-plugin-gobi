@@ -62,31 +62,6 @@ vagrant@kohadevbox:~$ curl http://localhost:8080/api/v1/gobi/orders
 
 If you get a response from the api, you are on the right track.
 
-### Deprecated setup
-
-If your Koha is too old (prior to 18.11), you need to upgrade it :-D But you can still set the old
-CGI script for GOBI:
-
-You need to tweak your _Apache_ vhost configuration for the intranet. If you are using the packages
-install method (you should!) given the instance name **instance** you need to edit the
-_/etc/apache2/sites-available/**instance**.conf_ file. Look for the intranet vhost and add this:
-
-```
-ScriptAlias /gobi "/var/lib/koha/instance/plugins/Koha/Plugin/Com/Theke/GOBI/gobi"
-Alias /plugin "/var/lib/koha/instance/plugins"
-<Directory /var/lib/koha/mykoha/plugins>
-      Options Indexes FollowSymLinks
-      AllowOverride None
-      Require all granted
-</Directory>
-Then restart _koha-common_ again:
-```
-
-Then restart _apache_:
-```
-$ sudo systemctl restart apache2.service
-```
-
 ## Configure the plugin
 
 * Create a **GOBI vendor** in Koha. Pick the vendor id (*booksellerid* on the URL).
@@ -114,13 +89,12 @@ You will need to send GOBI some CSV files, each containing:
 
 _GOBI_ handles **USD** and **GBP** as currency codes. They need to be set likewise in Koha.
 
-## TODO
+## Notes
 
 * _GOBI_ only accepts the *<POLineNumber>* value in the response message. Because of this, and in order
   to be able to match the full record using 999$c later (once the full record is submitted), the plugin 
   returns the resulting **biblionumber** on that field until _GOBI_ accepts more information to be returned.
 * It is not clear if _GOBI_ price includes taxes, and which percentage.
-* There might be some discount applied that is not included on the GOBI message.
 * We are not checking if funds are enough and what to do in that case.
 * _GOBI_ orders visualization needs some love, based on users input.
 
