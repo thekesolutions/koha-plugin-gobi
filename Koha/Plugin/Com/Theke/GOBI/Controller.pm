@@ -70,6 +70,9 @@ sub add_order {
         my $body = $c->req->body;
 
         if ( !defined $body ) {
+
+            warn "ORDER_DATA_MISSING: Purchase Order XML data is missing in POST.";
+
             $c->render(
                 status => 400,
                 text   => $c->render_response(
@@ -93,6 +96,8 @@ sub add_order {
             );
         }
         catch {
+
+            warn "REQUEST_PROCESSING_ERROR: $_";
 
             return $c->render(
                 status => 400,
