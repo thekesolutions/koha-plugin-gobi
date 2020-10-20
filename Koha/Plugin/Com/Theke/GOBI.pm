@@ -273,7 +273,7 @@ sub add_order {
         $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
         # Add biblio
-        my $biblionumber = $self->_add_biblio($gobi_order);
+        my ( $biblionumber, $biblioitemnumber ) = $self->_add_biblio($gobi_order);
 
         my $order_data = {
             biblionumber               => $biblionumber,
@@ -476,9 +476,9 @@ sub _add_biblio {
         $record->insert_fields_ordered( $field_942 );
     }
 
-    my ( $biblionumber, undef ) = AddBiblio( $record, '' );
+    my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, '' );
 
-    return $biblionumber;
+    return ( $biblionumber, $biblioitemnumber );
 }
 
 sub _generate_item_data {
