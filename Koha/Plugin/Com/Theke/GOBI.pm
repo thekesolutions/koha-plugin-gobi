@@ -25,7 +25,7 @@ use base qw(Koha::Plugins::Base);
 use C4::Acquisition qw/NewBasket CloseBasket/;
 use C4::Auth;
 use C4::Biblio qw/AddBiblio GetMarcBiblio/;
-use C4::Items qw/AddItem/;
+use C4::Items;
 use C4::Context;
 use C4::Matcher;
 
@@ -300,7 +300,19 @@ sub add_order {
         {
             for ( my $i = 0; $i < $quantity; $i++ ) {
                 my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price );
-                my ( undef, undef, $itemnumber ) = AddItem( $item_data, $biblionumber );
+
+                my $itemnumber;
+                if ( C4::Context->preference('Version') ge '20.050000' ) {
+                    $item_data->{biblionumber}     = $biblionumber;
+                    $item_data->{biblioitemnumber} = $biblioitemnumber;
+                    my $item_obj = Koha::Item->new( $item_data );
+                    $item_obj->store->discard_changes;
+                    $itemnumber = $item_obj->itemnumber;
+                }
+                else {
+                    ( undef, undef, $itemnumber ) = C4::Items::AddItem( $item_data, $biblionumber );
+                }
+
                 push @itemnumbers, $itemnumber;
                 $koha_order->add_item($itemnumber);
             }
