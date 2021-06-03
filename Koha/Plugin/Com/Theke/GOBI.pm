@@ -22,7 +22,7 @@ use utf8;
 
 use base qw(Koha::Plugins::Base);
 
-use C4::Acquisition qw/NewBasket CloseBasket/;
+use C4::Acquisition;
 use C4::Auth;
 use C4::Biblio qw/AddBiblio GetMarcBiblio/;
 use C4::Items;
@@ -31,6 +31,7 @@ use C4::Matcher;
 
 use Koha::Acquisition::Booksellers;
 use Koha::Biblios;
+use Koha::Acquisition::Baskets;
 use Koha::Acquisition::Currencies;
 use Koha::Items;
 use Koha::ItemTypes;
@@ -318,7 +319,13 @@ sub add_order {
             }
         }
 
-        C4::Acquisition::CloseBasket( $basket_id );
+        if ( C4::Context->preference('Version') ge '20.110000' ) {
+            my $basket = Koha::Acquisition::Baskets->find( $basket_id );
+            $basket->close();
+        }
+        else {
+            C4::Acquisition::CloseBasket( $basket_id );
+        }
 
         $schema->storage->txn_commit;
         # All good, return ordernumber
