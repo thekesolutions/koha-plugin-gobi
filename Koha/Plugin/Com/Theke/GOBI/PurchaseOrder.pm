@@ -20,7 +20,7 @@ package Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
 use Modern::Perl;
 
 use List::MoreUtils qw/any/;
-use MARC::File::XML;
+use MARC::File::XML ( BinaryEncoding => 'utf8', RecordFormat => 'MARC21' );
 use MARC::Record;
 use Try::Tiny;
 
