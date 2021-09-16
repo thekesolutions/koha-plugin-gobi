@@ -29,16 +29,16 @@ To set up the Koha plugin system you must first make some changes to your instal
 * Change `<enable_plugins>0<enable_plugins>` to `<enable_plugins>1</enable_plugins>` in your koha-conf.xml file
 * Confirm that the path to `<pluginsdir>` exists, is correct, and is writable by the web server
 * Restart _memcached_:
-```
+
+```shell
 $ sudo systemctl restart memcached.service
 ```
+
 * Restart _koha-common_:
-```
+
+```shell
 $ sudo systemctl restart koha-common.service
 ```
-
-Once set up is complete you will need to alter your UseKohaPlugins system preference. On the Tools page you will
-see the Tools Plugins.
 
 Download the .kpz file from the [releases page](https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi/-/releases).
 Then upload the _kpz_ file in the plugins administration page.
