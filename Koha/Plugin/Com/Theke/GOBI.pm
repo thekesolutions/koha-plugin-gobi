@@ -55,7 +55,7 @@ our $metadata = {
     description     => 'Integrates GOBI with Koha',
     date_authored   => '2017-05-10',
     date_updated    => '2020-03-24',
-    minimum_version => '17.0500000',
+    minimum_version => '19.1100000',
     maximum_version => undef,
     version         => $VERSION,
 };
