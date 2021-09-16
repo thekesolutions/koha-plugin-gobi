@@ -1,6 +1,6 @@
 {
   "name": "koha-plugin-gobi",
-  "version": "2.1.6",
+  "version": "2.1.7",
   "description": "Koha GOBI plugin",
   "devDependencies": {
     "gulp": "^3.9.1",
