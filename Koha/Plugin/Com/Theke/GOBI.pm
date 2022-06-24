@@ -25,6 +25,7 @@ use base qw(Koha::Plugins::Base);
 use C4::Acquisition;
 use C4::Auth;
 use C4::Biblio qw/AddBiblio GetMarcBiblio/;
+use C4::Installer;
 use C4::Items;
 use C4::Context;
 use C4::Matcher;
@@ -632,17 +633,6 @@ sub _check_item_type {
     return $item_type;
 }
 
-sub _table_exists {
-    my $table = shift;
-    eval {
-        C4::Context->dbh->{PrintError} = 0;
-        C4::Context->dbh->{RaiseError} = 1;
-        C4::Context->dbh->do(qq{SELECT * FROM $table WHERE 1 = 0 });
-    };
-    return 1 unless $@;
-    return 0;
-}
-
 sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
@@ -767,7 +757,7 @@ sub install {
 
     my $po_table = $self->get_qualified_table_name('purchase_orders');
 
-    C4::Context->dbh->do("
+    C4::Context->dbh->do(qq{
         CREATE TABLE $po_table (
           `id` INT(11) NOT NULL auto_increment,
           `status` TEXT,
@@ -778,7 +768,7 @@ sub install {
           KEY basketno ( basketno),
           CONSTRAINT gobipo_basketno FOREIGN KEY ( basketno ) REFERENCES aqbasket ( basketno ) ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-    ") unless $self->_table_exists($po_table);
+    }) unless C4::Installer::TableExists($po_table);
 
     return 1;
 }
