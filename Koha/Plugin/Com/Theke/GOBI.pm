@@ -25,9 +25,10 @@ use base qw(Koha::Plugins::Base);
 use C4::Acquisition;
 use C4::Auth;
 use C4::Biblio qw/AddBiblio/;
+use C4::Context;
 use C4::Installer;
 use C4::Items;
-use C4::Context;
+use C4::MarcModificationTemplates qw(ModifyRecordWithTemplate);
 use C4::Matcher;
 
 use Koha::Acquisition::Booksellers;
@@ -482,6 +483,17 @@ sub _add_biblio {
         # new field
         $field_942 = MARC::Field->new( '942', ' ', ' ', @subfields );
         $record->insert_fields_ordered( $field_942 );
+    }
+
+    my $marc_mod_template_id = $self->retrieve_data('marc_mod_template');
+
+    if ( $marc_mod_template_id ) {
+        try {
+            ModifyRecordWithTemplate( $marc_mod_template_id, $record );
+        }
+        catch {
+            warn "[gobi_plugin] Error applying ModifyRecordWithTemplate( $marc_mod_template_id ): $_";
+        }
     }
 
     my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, '' );
