@@ -24,7 +24,7 @@ use base qw(Koha::Plugins::Base);
 
 use C4::Acquisition;
 use C4::Auth;
-use C4::Biblio qw/AddBiblio GetMarcBiblio/;
+use C4::Biblio qw/AddBiblio/;
 use C4::Installer;
 use C4::Items;
 use C4::Context;
