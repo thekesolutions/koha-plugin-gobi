@@ -655,6 +655,7 @@ sub configure {
     my $lem_sort2 = $self->retrieve_data( 'lem_sort2' );
     my $les_sort1 = $self->retrieve_data( 'les_sort1' );
     my $les_sort2 = $self->retrieve_data( 'les_sort2' );
+    my $marc_mod_template = $self->retrieve_data('marc_mod_template');
     my $create_item_for_electronic_resources = $self->retrieve_data( 'create_item_for_electronic_resources' );
     my $add_nonpublic_item_notes = $self->retrieve_data( 'add_nonpublic_item_notes' );
 
@@ -676,7 +677,8 @@ sub configure {
         les_sort1 => $les_sort1,
         les_sort2 => $les_sort2,
         create_item_for_electronic_resources => $create_item_for_electronic_resources,
-        add_nonpublic_item_notes => $add_nonpublic_item_notes
+        add_nonpublic_item_notes => $add_nonpublic_item_notes,
+        marc_mod_template => $marc_mod_template,
     );
 
     print $cgi->header( -charset => 'utf-8' );
@@ -704,6 +706,7 @@ sub _configure {
     my $lem_sort2 = $cgi->param('lem_sort2') // q{};
     my $les_sort1 = $cgi->param('les_sort1') // q{};
     my $les_sort2 = $cgi->param('les_sort2') // q{};
+    my $marc_mod_template = $cgi->param('marc_mod_template') // q{};
     my $create_item_for_electronic_resources = $cgi->param('create_item_for_electronic_resources') // 0;
     my $add_nonpublic_item_notes = $cgi->param('add_nonpublic_item_notes') // 0;
 
@@ -727,6 +730,7 @@ sub _configure {
     $self->store_data({ 'les_sort2' => $les_sort2 });
     $self->store_data({ 'create_item_for_electronic_resources' => $create_item_for_electronic_resources });
     $self->store_data({ 'add_nonpublic_item_notes' => $add_nonpublic_item_notes });
+    $self->store_data({ marc_mod_template => $marc_mod_template });
 
     $self->_list_orders();
 }

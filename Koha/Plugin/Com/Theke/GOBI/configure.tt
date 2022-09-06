@@ -129,6 +129,10 @@
                   <option value="0" [% IF !add_nonpublic_item_notes %]selected[% END %]>No</option>
                 </select>
             </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="marc_mod_template">MARC modification template to apply</span>
+                <input type="text" class="form-control" aria-describedby="marc_mod_template" name="marc_mod_template" id="marc_mod_template" value="[% marc_mod_template %]" />
+            </div>
             <br/>
             <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
       </form>
