@@ -57,7 +57,7 @@ our $metadata = {
     description     => 'Integrates GOBI with Koha',
     date_authored   => '2017-05-10',
     date_updated    => '1900-01-01',
-    minimum_version => '19.1100000',
+    minimum_version => '22.1100000',
     maximum_version => undef,
     version         => $VERSION,
 };
@@ -293,31 +293,23 @@ sub add_order {
             currency                   => $currency,
             suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
         };
-        $order_data = $self->_add_price_data( $vendor_id, $price, $quantity, $order_data );
+        $order_data = $self->_prepare_order_data( $vendor_id, $price, $quantity, $order_data );
 
         $koha_order = Koha::Acquisition::Order->new($order_data);
-        $koha_order->store;
-        $koha_order->discard_changes; # reload from DB
+        $koha_order->populate_with_prices_for_ordering()->store()->discard_changes();
 
         if ( $create_items && $quantity > 0 )
         {
             for ( my $i = 0; $i < $quantity; $i++ ) {
                 my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price );
 
-                my $itemnumber;
-                if ( C4::Context->preference('Version') ge '20.050000' ) {
-                    $item_data->{biblionumber}     = $biblionumber;
-                    $item_data->{biblioitemnumber} = $biblioitemnumber;
-                    my $item_obj = Koha::Item->new( $item_data );
-                    $item_obj->store->discard_changes;
-                    $itemnumber = $item_obj->itemnumber;
-                }
-                else {
-                    ( undef, undef, $itemnumber ) = C4::Items::AddItem( $item_data, $biblionumber );
-                }
+                $item_data->{biblionumber}     = $biblionumber;
+                $item_data->{biblioitemnumber} = $biblioitemnumber;
+                my $item = Koha::Item->new( $item_data );
+                $item->store->discard_changes;
 
-                push @itemnumbers, $itemnumber;
-                $koha_order->add_item($itemnumber);
+                push @itemnumbers, $item->id;
+                $koha_order->add_item($item->id);
             }
         }
 
@@ -527,7 +519,7 @@ sub _generate_item_data {
     return $item_data;
 }
 
-sub _add_price_data {
+sub _prepare_order_data {
     my ( $self, $bookseller_id, $price, $quantity, $order_data ) = @_;
 
     my $bookseller      = Koha::Acquisition::Booksellers->find($bookseller_id);
@@ -562,14 +554,6 @@ sub _add_price_data {
     else {
         $order_data->{listprice} = 0;
     }
-
-    $order_data = C4::Acquisition::populate_order_with_prices(
-        {   order        => $order_data,
-            booksellerid => $bookseller_id,
-            ordering     => 1,
-            receiving    => 1,
-        }
-    );
 
     return $order_data;
 }
