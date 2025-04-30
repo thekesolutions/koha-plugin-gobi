@@ -27,6 +27,8 @@
         <input type="hidden" name="class"  value="[% CLASS %]"/>
         <input type="hidden" name="method" value="[% METHOD %]"/>
         <input type="hidden" name="step"   value="add"/>
+        <input type="hidden" name="op"     value="cud-save"/>
+        [% INCLUDE 'csrf-token.inc' %]
         <p>
             <label for="purchase-order-xml">Paste your new GOBI PO here: </label>
             <input type="text" name="purchase-order-xml"/>
