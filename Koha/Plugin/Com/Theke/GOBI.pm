@@ -275,6 +275,8 @@ sub add_order {
         # Store on the plugin table TODO: Figure what we would really need
         $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
+        $schema->storage->txn_commit;
+
         # Add biblio
         my ( $biblionumber, $biblioitemnumber ) = $self->_add_biblio($gobi_order);
 
@@ -321,7 +323,6 @@ sub add_order {
             C4::Acquisition::CloseBasket( $basket_id );
         }
 
-        $schema->storage->txn_commit;
         # All good, return ordernumber
         return $koha_order->ordernumber;
     }
