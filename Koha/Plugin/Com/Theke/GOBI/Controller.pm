@@ -39,7 +39,7 @@ Method that adds a new order from a GOBI request
 sub add_order {
     my $c = shift->openapi->valid_input or return;
 
-    my $api_key = $c->validation->param('api_key');
+    my $api_key = $c->param('api_key');
     my $gobi = Koha::Plugin::Com::Theke::GOBI->new;
 
     # Check API key is present
