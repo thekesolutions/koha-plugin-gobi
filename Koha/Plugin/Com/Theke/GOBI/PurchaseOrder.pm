@@ -29,7 +29,18 @@ use Koha::Plugin::Com::Theke::GOBI::Exception;
 use base qw(Class::Accessor);
 
 __PACKAGE__->mk_accessors(
-    qw( record standing type is_electronic CustomerDetail OrderDetail item_po_number item_type shelving_location selector_notes )
+    qw(
+        record
+        standing
+        type
+        is_electronic
+        CustomerDetail
+        OrderDetail
+        item_po_number
+        item_type
+        shelving_location
+        selector_notes
+        managing_library_id )
 );
 
 sub new {
@@ -44,12 +55,10 @@ sub new {
     my $result;
     try {
         $result = _read_xml($xml);
-    }
-    catch {
+    } catch {
         if ( ref($_) && $_->isa('GOBI::Exception') ) {
             $_->rethrow();
-        }
-        else {
+        } else {
             GOBI::Exception->throw( error => $_ );
         }
     };
@@ -71,8 +80,7 @@ sub _read_xml {
     my $xml;
     try {
         $xml = $parser->load_xml( string => $xml_string );
-    }
-    catch {
+    } catch {
         GOBI::Exception->throw( error => 'XML error' );
     };
 
@@ -82,6 +90,7 @@ sub _read_xml {
 
     my $order_type_xml = @{ $xml->find('//PurchaseOrder/Order/*[1]') }[0];
     $result->{type} = $order_type_xml->tagName;
+
     # $result->{standing}
     #     = any { $_ eq $result->{type} } qw( ListedElectronicSerial ListedPrintSerial );
 
@@ -89,24 +98,28 @@ sub _read_xml {
     $result->{CustomerDetail} = _read_customer_detail($xml);
     $result->{OrderDetail}    = _read_order_detail($xml);
     $result->{item_po_number} = $result->{OrderDetail}->{ItemPONumber};
-    $result->{item_type}
-        = ( @{ $result->{OrderDetail}->{LocalData} }[0] )
+    $result->{item_type} =
+        ( @{ $result->{OrderDetail}->{LocalData} }[0] )
         ? %{ @{ $result->{OrderDetail}->{LocalData} }[0] }{value}
         : '';
-    $result->{shelving_location}
-        = ( @{ $result->{OrderDetail}->{LocalData} }[1] )
+    $result->{shelving_location} =
+        ( @{ $result->{OrderDetail}->{LocalData} }[1] )
         ? %{ @{ $result->{OrderDetail}->{LocalData} }[1] }{value}
         : '';
-    $result->{selector_notes}
-        = ( @{ $result->{OrderDetail}->{LocalData} }[2] )
+    $result->{selector_notes} =
+        ( @{ $result->{OrderDetail}->{LocalData} }[2] )
         ? %{ @{ $result->{OrderDetail}->{LocalData} }[2] }{value}
         : '';
+    $result->{managing_library_id} =
+        ( @{ $result->{OrderDetail}->{LocalData} }[3] )
+        ? %{ @{ $result->{OrderDetail}->{LocalData} }[3] }{value}
+        : '';
 
-    if ( $result->{type} eq 'ListedElectronicMonograph' or
-         $result->{type} eq 'ListedElectronicSerial' ) {
+    if (   $result->{type} eq 'ListedElectronicMonograph'
+        or $result->{type} eq 'ListedElectronicSerial' )
+    {
         $result->{is_electronic} = 1;
-    }
-    else {
+    } else {
         $result->{is_electronic} = 0;
     }
 
@@ -149,8 +162,8 @@ sub _read_order_detail {
     foreach my $local_data ( @{ $xml->find('//PurchaseOrder/Order//OrderDetail/LocalData') } ) {
         push @{$LocalData},
             {
-                description => @{ $local_data->find('Description') }[0]->textContent,
-                value       => @{ $local_data->find('Value') }[0]->textContent
+            description => @{ $local_data->find('Description') }[0]->textContent,
+            value       => @{ $local_data->find('Value') }[0]->textContent
             };
     }
 
@@ -173,9 +186,8 @@ sub _read_order_detail {
     $order_detail->{LocalData} = $LocalData
         if defined $LocalData;
 
-    my $ListPriceAmount = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/ListPrice/Amount') }[0];
-    my $ListPriceCurrency
-        = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/ListPrice/Currency') }[0];
+    my $ListPriceAmount   = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/ListPrice/Amount') }[0];
+    my $ListPriceCurrency = @{ $xml->find('//PurchaseOrder/Order//OrderDetail/ListPrice/Currency') }[0];
 
     $order_detail->{ListPriceAmount} = $ListPriceAmount->textContent
         if defined $ListPriceAmount;
