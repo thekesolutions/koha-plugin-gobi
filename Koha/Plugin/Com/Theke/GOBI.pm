@@ -252,7 +252,7 @@ sub add_order {
 
         my $currency  = $self->_check_currency($gobi_order);
         my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
-        my $library   = $self->_check_library_code($gobi_order);
+        my $library   = $self->_check_library_code($gobi_order->OrderDetail->{Location});
 
         # Create a basket
         my $basket_id = C4::Acquisition::NewBasket(
@@ -497,7 +497,7 @@ sub _add_biblio {
 sub _generate_item_data {
     my ( $self, $gobi_order, $vendor_id, $price ) = @_;
 
-    my $library_id = $self->_check_library_code($gobi_order);
+    my $library_id = $self->_check_library_code($gobi_order->OrderDetail->{Location});
     my $item_type  = $self->_check_item_type($gobi_order);
     my $not_loan   = $self->retrieve_data('not_loan') // -5 ;
 
@@ -586,19 +586,25 @@ sub _check_fund_code {
     return $budget->id;
 }
 
-sub _check_library_code {
-    my ( $self, $gobi_order ) = @_;
+=head2 _check_library_code
 
-    # We actually call it fund
-    my $library_id = $gobi_order->OrderDetail->{Location};
+    my $library_id = $plugin->_check_library_code($library_code);
+
+Checks if the passed library code is valid. Throws I<GOBI::Exception>
+if it isn't.
+
+=cut
+
+sub _check_library_code {
+    my ( $self, $library_code ) = @_;
 
     GOBI::Exception->throw("Missing library id.")
         unless defined $library_id;
 
-    GOBI::Exception->throw("Invalid library code passed ($library_id)")
-        unless Koha::Libraries->find($library_id);
+    GOBI::Exception->throw("Invalid library code passed ($library_code)")
+        unless Koha::Libraries->find($library_code);
 
-    return $library_id;
+    return $library_code;
 }
 
 sub _check_currency {
