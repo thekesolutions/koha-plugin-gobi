@@ -1,27 +1,35 @@
+[% USE raw %]
+
 [% INCLUDE 'doc-head-open.inc' %]
- <title>Koha &rsaquo; Tools &rsaquo; GOBI acquisitions</title>
+<title>Koha: GOBI</title>
 [% INCLUDE 'doc-head-close.inc' %]
-  <style>
-    .gobi {
-      width: 70%;
-    }
-  </style>
 </head>
+
 <body>
-[% INCLUDE 'header.inc' %]
-[% INCLUDE 'cat-search.inc' %]
+[% WRAPPER 'header.inc' %]
+    [% INCLUDE 'cat-search.inc' %]
+[% END %]
 
-<div id="breadcrumbs">
-    <a href="/cgi-bin/koha/mainpage.pl">Home</a> &rsaquo;
-    <a href="/cgi-bin/koha/mainpage.pl">Tools</a> &rsaquo;
-    <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a> &rsaquo;
-    <a href="?class=[% CLASS %]&method=[% METHOD %]">GOBI</a>
-</div>
+[% WRAPPER 'sub-header.inc' %]
+    [% WRAPPER breadcrumbs %]
+        [% WRAPPER breadcrumb_item %]
+            <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a>
+        [% END %]
+        [% WRAPPER breadcrumb_item %]
+            <a href="#">GOBI</a>
+        [% END %]
+        [% WRAPPER breadcrumb_item %]
+            <a href="/cgi-bin/koha/plugins/run.pl?class=Koha%3A%3APlugin%3A%3ACom%3A%3ATheke%3A%3AGOBI&method=tool">Orders</a>
+        [% END %]
+    [% END #/ WRAPPER breadcrumbs %]
+[% END #/ WRAPPER sub-header.inc %]
 
-<div id="doc3" class="yui-t2">
-  <div id="yui-main">
-    <h2>GOBI acquisitions</h2>
-    <br/>
+<div class="main container-fluid">
+    <div class="row">
+        <div class="col-md-10 order-md-2 order-sm-1">
+            <h1>GOBI acquisitions</h1>
+
+      <br>
 
     [% IF ( error ) %]
     <div class="dialog alert">

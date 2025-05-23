@@ -332,7 +332,7 @@ sub _get_order {
     my $cgi = $self->{cgi};
     my $id  = $cgi->param('gobi_order_id');
 
-    my $template = $self->get_template( { file => 'order_details.tt' } );
+    my $template = $self->get_template( { file => 'templates/order_details.tt' } );
 
     my $gobi_order;
 
@@ -351,15 +351,14 @@ sub _get_order {
         gpo_id     => $id
     );
 
-    print $cgi->header( -charset => 'utf-8' );
-    print $template->output();
+    $self->output_html( $template->output() );
 }
 
 sub _list_orders {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
 
-    my $template = $self->get_template( { file => 'main.tt' } );
+    my $template = $self->get_template( { file => 'templates/main.tt' } );
 
     # Fetch from DB marching a criteria
     my $table = $self->get_qualified_table_name('purchase_orders');
@@ -540,7 +539,7 @@ sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
 
-    my $template = $self->get_template( { file => 'configure.tt' } );
+    my $template = $self->get_template( { file => 'templates/configure.tt' } );
 
     my $api_key                              = $self->retrieve_data('api_key');
     my $vendor_id                            = $self->retrieve_data('vendor_id');
@@ -740,6 +739,19 @@ sub uninstall {
     return 1;
 }
 
+=head3 template_include_paths
+
+Plugin hook used to register paths to find templates
+
+=cut
+
+sub template_include_paths {
+    my ($self) = @_;
+
+    return [
+        $self->mbf_path('templates'),
+    ];
+}
 =head2 Internal methods
 
 =head3 set_managing_library
