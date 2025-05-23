@@ -3,16 +3,14 @@
   "version": "3.1.1",
   "description": "Koha GOBI plugin",
   "devDependencies": {
-    "gulp": "^3.9.1",
-    "gulp-cli": "^1.2.2",
-    "gulp-github-release": "^1.1.5",
-    "gulp-run": "^1.7.1"
+    "gulp": "^4.0.2",
+    "gulp-cli": "^3.0.0"
   },
   "scripts": {
     "preversion": "sed -i -e \"s/^our \\$VERSION = .*/our \\$VERSION = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/Theke/GOBI.pm; git add -u; rm Koha/Plugin/Com/Theke/GOBI.pm-e",
     "test": "echo \"Error: no test specified\" && exit 1",
     "kpz": "echo -n ${npm_package_name}-v${npm_package_version}.kpz",
-    "name": "echo -n ${npm_package_name}"
+    "print-name": "echo -n ${npm_package_name}"
   },
   "repository": {
     "type": "git",
@@ -25,8 +23,6 @@
   },
   "homepage": "https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi",
   "dependencies": {
-    "datetime": "0.0.3",
-    "jsonfile": "^4.0.0",
     "node-datetime": "^2.0.0"
   }
 }
