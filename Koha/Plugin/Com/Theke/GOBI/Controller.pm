@@ -40,38 +40,42 @@ sub add_order {
     my $c = shift->openapi->valid_input or return;
 
     my $api_key = $c->param('api_key');
-    my $gobi = Koha::Plugin::Com::Theke::GOBI->new;
+    my $plugin  = Koha::Plugin::Com::Theke::GOBI->new;
 
     # Check API key is present
     if ( !defined $api_key ) {
         $c->render(
             status => 400,
-            text   => $c->render_response({
-                error   => 1,
-                code    => 'API_KEY_MISSING',
-                message => "API Key parameter missing on request."
-            })
+            text   => $c->render_response(
+                {
+                    error   => 1,
+                    code    => 'API_KEY_MISSING',
+                    message => "API Key parameter missing on request."
+                }
+            )
         );
     }
 
     # Check API key is valid
-    if ( !$gobi->api_key_valid($api_key) ) {
+    if ( !$plugin->api_key_valid($api_key) ) {
         $c->render(
             status => 403,
-            text   => $c->render_response({
-                error   => 1,
-                code    => 'API_KEY_INVALID',
-                message => "The API Key \"$api_key\" is an invalid."
-            })
+            text   => $c->render_response(
+                {
+                    error   => 1,
+                    code    => 'API_KEY_INVALID',
+                    message => "The API Key \"$api_key\" is an invalid."
+                }
+            )
         );
-    }else {
+    } else {
 
         # Ok, passed, moving on!
         my $body = $c->req->body;
 
         if ( !defined $body ) {
 
-            warn "ORDER_DATA_MISSING: Purchase Order XML data is missing in POST.";
+            $plugin->gobi_warn("ORDER_DATA_MISSING: Purchase Order XML data is missing in POST");
 
             $c->render(
                 status => 400,
@@ -86,26 +90,27 @@ sub add_order {
         }
 
         return try {
-            my $order_id = $gobi->add_order($body);
+            my $order_id = $plugin->add_order($body);
             unless ($order_id) {
                 GOBI::Exception->throw('No order generated.');
             }
             $c->render(
                 status => 200,
-                text   => $c->render_response({ order_id => $order_id })
+                text   => $c->render_response( { order_id => $order_id } )
             );
-        }
-        catch {
+        } catch {
 
-            warn "REQUEST_PROCESSING_ERROR: $_";
+            $plugin->gobi_warn( sprintf( "REQUEST_PROCESSING_ERROR: %s", $_ ) );
 
             return $c->render(
                 status => 400,
-                text   => $c->render_response({
-                    error   => 1,
-                    code    => 'REQUEST_PROCESSING_ERROR',
-                    message => "$_"
-                })
+                text   => $c->render_response(
+                    {
+                        error   => 1,
+                        code    => 'REQUEST_PROCESSING_ERROR',
+                        message => "$_"
+                    }
+                )
             );
         };
     }
@@ -120,9 +125,9 @@ Internal method that generates the XML string representing a response
 =cut
 
 sub render_response {
-    my ($c, $args) = @_;
+    my ( $c, $args ) = @_;
 
-    my $code     = $args->{code} // '';
+    my $code     = $args->{code}    // '';
     my $message  = $args->{message} // '';
     my $order_id = $args->{order_id};
 
@@ -140,8 +145,7 @@ sub render_response {
         <Message>$message</Message>
     </Error>
 </Response>};
-    }
-    else {
+    } else {
         $xml = qq{<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <PoLineNumber>$order_id</PoLineNumber>

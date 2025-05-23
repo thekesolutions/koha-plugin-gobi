@@ -22,9 +22,9 @@ use utf8;
 
 use base qw(Koha::Plugins::Base);
 
-use C4::Acquisition;
+use C4::Acquisition qw(ModBasket NewBasket);
 use C4::Auth;
-use C4::Biblio qw/AddBiblio/;
+use C4::Biblio qw(AddBiblio);
 use C4::Context;
 use C4::Installer;
 use C4::Items;
@@ -35,10 +35,13 @@ use Koha::Acquisition::Booksellers;
 use Koha::Biblios;
 use Koha::Acquisition::Baskets;
 use Koha::Acquisition::Currencies;
+use Koha::Exceptions;
 use Koha::Items;
 use Koha::ItemTypes;
 use Koha::Libraries;
 use Koha::Number::Price;
+use Koha::SearchEngine;
+use Koha::SearchEngine::Indexer;
 
 use Koha::Plugin::Com::Theke::GOBI::PurchaseOrder;
 use Koha::Plugin::Com::Theke::GOBI::Exception;
@@ -61,10 +64,6 @@ our $metadata = {
     maximum_version => undef,
     version         => $VERSION,
 };
-
-use Exception::Class (
-    'GOBI::Exception'
-);
 
 =head1 METHODS
 
@@ -89,17 +88,14 @@ sub tool {
 
     if ( $step eq 'list' ) {
         $self->_list_orders();
-    }
-    elsif ( $step eq 'add' ) {
+    } elsif ( $step eq 'add' ) {
         $self->_add_order();
-    }
-    elsif ( $step eq 'get' ) {
+    } elsif ( $step eq 'get' ) {
         $self->_get_order();
-    }
-    elsif ( $step eq 'configure' ) {
+    } elsif ( $step eq 'configure' ) {
         $self->_configure();
-    }
-    else {
+    } else {
+
         # $step eq 'render'
         $self->_list_orders();
     }
@@ -123,7 +119,7 @@ $self->response_error({ order_id => 123456 });
 sub response_success {
     my ( $self, $params ) = @_;
 
-    my $cgi = $self->{ cgi };
+    my $cgi = $self->{cgi};
     print $cgi->header(
         -type     => 'text/xml',
         -charset  => 'UTF-8',
@@ -131,7 +127,7 @@ sub response_success {
     );
     say "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
     say "<Response>";
-    say "    <PoLineNumber>" . $params->{ order_id } . "</PoLineNumber>";
+    say "    <PoLineNumber>" . $params->{order_id} . "</PoLineNumber>";
     say "</Response>";
     exit;
 }
@@ -167,8 +163,8 @@ sub response_error {
     say "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
     say "<Response>";
     say "    <Error>";
-    say "        <Code>" . $params->{ error_code } . "</Code>";
-    say "        <Message>" . $params->{ error_description } . "</Message>";
+    say "        <Code>" . $params->{error_code} . "</Code>";
+    say "        <Message>" . $params->{error_description} . "</Message>";
     say "    </Error>";
     say "</Response>";
     exit;
@@ -188,7 +184,7 @@ sub api_key_valid {
     my $ret;
 
     if ( defined $api_key ) {
-        my $gobi_api_key = $self->retrieve_data( 'api_key' );
+        my $gobi_api_key = $self->retrieve_data('api_key');
 
         if ( $api_key eq $gobi_api_key ) {
             $ret = 1;
@@ -213,136 +209,121 @@ sub add_order {
     my $gobi_order;
     my $gobi_order_id;
     my $koha_order;
+    my ( $biblionumber, $biblioitemnumber );
 
     my @itemnumbers;
 
-    my $schema = Koha::Database->new()->schema();
-    $schema->storage->txn_begin();
+    Koha::Database->new->schema->txn_do(
+        sub {
 
-    my $result = try {
-        # Parse the raw purchase order
-        $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($raw_gobi_order);
+            # Parse the raw purchase order
+            $gobi_order = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new($raw_gobi_order);
 
-        my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
+            my $quantity = $gobi_order->OrderDetail->{Quantity} // 0;
 
-        # Should Electronic resources create items?
-        my  $create_item_for_electronic_resources = $self->retrieve_data('create_item_for_electronic_resources');
-        my $create_items = (!$create_item_for_electronic_resources and $gobi_order->is_electronic)
-                                ? 0
-                                : 1;
+            # Should Electronic resources create items?
+            my $create_item_for_electronic_resources = $self->retrieve_data('create_item_for_electronic_resources');
+            my $create_items =
+                ( !$create_item_for_electronic_resources and $gobi_order->is_electronic )
+                ? 0
+                : 1;
 
-        # Some basic checks for data health
-        my $fund_id   = $self->_check_fund_code($gobi_order);
+            # Some basic checks for data health
+            my $fund_id = $self->check_fund_code($gobi_order->OrderDetail->{FundCode});
 
-        my $patron_id = $self->retrieve_data('patron_id');
-        my $patron    = Koha::Patrons->find($patron_id);
-        GOBI::Exception->throw( error => "Invalid configuration (patron_id)" )
-            unless $patron;
+            my $patron_id = $self->retrieve_data('patron_id');
+            my $patron    = Koha::Patrons->find($patron_id);
+            GOBI::Exception->throw( error => "Invalid configuration (patron_id)" )
+                unless $patron;
 
-        # There are side effects in AddBiblio and Koha::Acquisition::Order->store
-        # that will read the 'number' param in userenv to set the biblio and order creator.
-        # It can be passed explicitly in $order->store, but not in AddBiblio.
-        C4::Context->set_userenv( $patron_id );
+            # There are side effects in AddBiblio and Koha::Acquisition::Order->store
+            # that will read the 'number' param in userenv to set the biblio and order creator.
+            # It can be passed explicitly in $order->store, but not in AddBiblio.
+            C4::Context->set_userenv($patron_id);
 
-        # GOBI has VendorCode, but we need Koha's vendor id, which we have already
-        my $vendor_id = $self->retrieve_data('vendor_id');
-        my $vendor = Koha::Acquisition::Booksellers->find( $vendor_id );
-        GOBI::Exception->throw( error => "Invalid configuration (vendor_id)" )
-            unless $vendor;
+            # GOBI has VendorCode, but we need Koha's vendor id, which we have already
+            my $vendor_id = $self->retrieve_data('vendor_id');
+            my $vendor    = Koha::Acquisition::Booksellers->find($vendor_id);
+            GOBI::Exception->throw( error => "Invalid configuration (vendor_id)" )
+                unless $vendor;
 
-        my $currency  = $self->_check_currency($gobi_order);
-        my $price     = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
-        my $library   = $self->_check_library_code($gobi_order->OrderDetail->{Location});
+            my $currency = $self->check_currency($gobi_order->OrderDetail->{ListPriceCurrency});
+            my $price    = $gobi_order->OrderDetail->{ListPriceAmount} // 0;
+            my $library  = $self->check_library_code( $gobi_order->OrderDetail->{Location} );
 
-        # Create a basket
-        my $basket_id = C4::Acquisition::NewBasket(
-            $vendor_id,             # booksellerid
-            $patron_id,             # authorisedby
-            $gobi_order
-              ->OrderDetail
-              ->{YBPOrderKey},      # basketname
-            q{},                    # basketnote
-            q{},                    # basketbooksellernote
-            q{},                    # basketcontractnumber
-            $library,               # deliveryplace
-            $library,               # billingplace
-            undef,                  # is_standing
-            ($create_items)
+            # Create a basket
+            my $basket_id = C4::Acquisition::NewBasket(
+                $vendor_id,                                 # booksellerid
+                $patron_id,                                 # authorisedby
+                $gobi_order->OrderDetail->{YBPOrderKey},    # basketname
+                q{},                                        # basketnote
+                q{},                                        # basketbooksellernote
+                q{},                                        # basketcontractnumber
+                $library,                                   # deliveryplace
+                $library,                                   # billingplace
+                undef,                                      # is_standing
+                ($create_items)
                 ? 'ordering'
-                : undef             # create_items
-        );
+                : undef                                     # create_items
+            );
 
-        # Store on the plugin table TODO: Figure what we would really need
-        $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
+            # Attempt to set the managing library
+            my $managing_library_id = $gobi_order->managing_library_id;
+            $self->set_managing_library( { basket_id => $basket_id, managing_library_id => $managing_library_id } )
+                if $managing_library_id;
 
-        $schema->storage->txn_commit;
+            # Store on the plugin table TODO: Figure what we would really need
+            $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
-        # Add biblio
-        my ( $biblionumber, $biblioitemnumber ) = $self->_add_biblio($gobi_order);
+            # Add biblio
+            ( $biblionumber, $biblioitemnumber ) = $self->_add_biblio($gobi_order);
 
-        my $order_data = {
-            biblionumber               => $biblionumber,
-            basketno                   => $basket_id,
-            created_by                 => $patron_id,
-            budget_id                  => $fund_id,
-            listprice                  => $price,
-            quantity                   => $quantity,
-            quantityreceived           => 0,
-            order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
-            order_internalnote         => $gobi_order->selector_notes,
-            sort1                      => $self->order_type_to_sort_value( $gobi_order, 'sort1' ),
-            sort2                      => $self->order_type_to_sort_value( $gobi_order, 'sort2' ),
-            currency                   => $currency,
-            suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
-        };
-        $order_data = $self->_prepare_order_data( $vendor_id, $price, $quantity, $order_data );
+            my $order_data = {
+                biblionumber               => $biblionumber,
+                basketno                   => $basket_id,
+                created_by                 => $patron_id,
+                budget_id                  => $fund_id,
+                listprice                  => $price,
+                quantity                   => $quantity,
+                quantityreceived           => 0,
+                order_vendornote           => $gobi_order->OrderDetail->{OrderNotes},
+                order_internalnote         => $gobi_order->selector_notes,
+                sort1                      => $self->order_type_to_sort_value( $gobi_order, 'sort1' ),
+                sort2                      => $self->order_type_to_sort_value( $gobi_order, 'sort2' ),
+                currency                   => $currency,
+                suppliers_reference_number => $gobi_order->OrderDetail->{YBPOrderKey}
+            };
+            $order_data = $self->_prepare_order_data( $vendor_id, $price, $quantity, $order_data );
 
-        $koha_order = Koha::Acquisition::Order->new($order_data);
-        $koha_order->populate_with_prices_for_ordering()->store()->discard_changes();
+            $koha_order = Koha::Acquisition::Order->new($order_data);
+            $koha_order->populate_with_prices_for_ordering()->store()->discard_changes();
 
-        if ( $create_items && $quantity > 0 )
-        {
-            for ( my $i = 0; $i < $quantity; $i++ ) {
-                my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price );
+            if ( $create_items && $quantity > 0 ) {
+                for ( my $i = 0 ; $i < $quantity ; $i++ ) {
+                    my $item_data = $self->_generate_item_data( $gobi_order, $vendor_id, $price );
 
-                $item_data->{biblionumber}     = $biblionumber;
-                $item_data->{biblioitemnumber} = $biblioitemnumber;
-                my $item = Koha::Item->new( $item_data );
-                $item->store->discard_changes;
+                    $item_data->{biblionumber}     = $biblionumber;
+                    $item_data->{biblioitemnumber} = $biblioitemnumber;
+                    my $item = Koha::Item->new($item_data);
+                    $item->store->discard_changes;
 
-                push @itemnumbers, $item->id;
-                $koha_order->add_item($item->id);
+                    push @itemnumbers, $item->id;
+                    $koha_order->add_item( $item->id );
+                }
             }
-        }
 
-        if ( C4::Context->preference('Version') ge '20.110000' ) {
-            my $basket = Koha::Acquisition::Baskets->find( $basket_id );
+            my $basket = Koha::Acquisition::Baskets->find($basket_id);
             $basket->close();
         }
-        else {
-            C4::Acquisition::CloseBasket( $basket_id );
-        }
+    );
 
-        # All good, return ordernumber
-        return $koha_order->ordernumber;
-    }
-    catch {
-        # Problem found, rollback transaction, notify error
-        $schema->storage->txn_rollback();
-        if ( $_->isa('GOBI::Exception') ) {
-            $_->rethrow();
-        }
-        else {
-            GOBI::Exception->throw( "$_" );
-        }
-    };
+    ## All good
+    # ask for indexing the record
+    my $indexer = Koha::SearchEngine::Indexer->new( { index => $Koha::SearchEngine::BIBLIOS_INDEX } );
+    $indexer->index_records( $biblionumber, "specialUpdate", "biblioserver" );
 
-    if ( $result->isa('GOBI::Exception') ) {
-        $result->rethrow();
-    }
-    else {
-        return $result;
-    }
+    # return ordernumber
+    return $koha_order->ordernumber;
 }
 
 sub _get_order {
@@ -357,12 +338,10 @@ sub _get_order {
 
     try {
         $gobi_order = $self->_get_gobi_order($id);
-    }
-    catch {
+    } catch {
         if ( $_->isa('Koha::Plugin::Com::Theke::GOBI::Exception') ) {
             $template->param( error => $_->error );
-        }
-        else {
+        } else {
             $template->param( error => $_ );
         }
     };
@@ -395,8 +374,7 @@ sub _list_orders {
         gobi_orders => $gobi_orders,
     );
 
-    print $cgi->header( -charset => 'utf-8' );
-    print $template->output();
+    $self->output_html( $template->output() );
 }
 
 sub _store_gobi_order {
@@ -445,8 +423,7 @@ sub _get_gobi_order {
     try {
         $gpo = Koha::Plugin::Com::Theke::GOBI::PurchaseOrder->new( $row->{raw_msg} );
         return $gpo;
-    }
-    catch {
+    } catch {
         return;
     };
 }
@@ -456,40 +433,42 @@ sub _add_biblio {
     my ( $self, $gobi_order ) = @_;
 
     my $record    = $gobi_order->{record};
-    my $itemtype  = $self->_check_item_type($gobi_order);
+    my $itemtype  = $self->check_item_type( $gobi_order->item_type );
     my $field_942 = $record->field('942');
 
     my @subfields;
     push @subfields, 'c' => $itemtype;
 
     if ( $gobi_order->is_electronic ) {
+
         # is electronic, suppress
         push @subfields, 'n' => '1';
     }
 
     if ($field_942) {
+
         # existing fields, auto-vivifies subfield if doesn't exist
         # https://metacpan.org/pod/MARC::Field#update()
-        $field_942->update( @subfields );
-    }
-    else {
+        $field_942->update(@subfields);
+    } else {
+
         # new field
         $field_942 = MARC::Field->new( '942', ' ', ' ', @subfields );
-        $record->insert_fields_ordered( $field_942 );
+        $record->insert_fields_ordered($field_942);
     }
 
     my $marc_mod_template_id = $self->retrieve_data('marc_mod_template');
 
-    if ( $marc_mod_template_id ) {
+    if ($marc_mod_template_id) {
         try {
             ModifyRecordWithTemplate( $marc_mod_template_id, $record );
-        }
-        catch {
-            warn "[gobi_plugin] Error applying ModifyRecordWithTemplate( $marc_mod_template_id ): $_";
+        } catch {
+            $self->gobi_warn(
+                sptrintf( "Error applying ModifyRecordWithTemplate(%s): %s", $marc_mod_template_id, $_ ) );
         }
     }
 
-    my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, '' );
+    my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, '', { skip_record_index => 1 } );
 
     return ( $biblionumber, $biblioitemnumber );
 }
@@ -497,9 +476,9 @@ sub _add_biblio {
 sub _generate_item_data {
     my ( $self, $gobi_order, $vendor_id, $price ) = @_;
 
-    my $library_id = $self->_check_library_code($gobi_order->OrderDetail->{Location});
-    my $item_type  = $self->_check_item_type($gobi_order);
-    my $not_loan   = $self->retrieve_data('not_loan') // -5 ;
+    my $library_id = $self->check_library_code( $gobi_order->OrderDetail->{Location} );
+    my $item_type  = $self->check_item_type( $gobi_order->item_type );
+    my $not_loan   = $self->retrieve_data('not_loan') // -5;
 
     my $item_data = {
         booksellerid     => $vendor_id,
@@ -515,7 +494,7 @@ sub _generate_item_data {
     };
 
     $item_data->{itemnotes_nonpublic} = $gobi_order->selector_notes // q{}
-        if $self->retrieve_data( 'add_nonpublic_item_notes' );
+        if $self->retrieve_data('add_nonpublic_item_notes');
 
     return $item_data;
 }
@@ -530,8 +509,8 @@ sub _prepare_order_data {
     $price = Koha::Number::Price->new($price)->unformat;
 
     # Get tax and discounts info from the vendor
-    my $tax_rate = $bookseller->tax_rate;
-    my $discount = $bookseller->discount // 0;
+    my $tax_rate     = $bookseller->tax_rate;
+    my $discount     = $bookseller->discount // 0;
     my $THE_discount = $discount / 100;
 
     $order_data->{tax_rate} = $tax_rate;
@@ -542,150 +521,70 @@ sub _prepare_order_data {
 
             # Vendor includes GST
             $order_data->{ecost} = $price * ( 1 - $discount );
-            $order_data->{rrp} = $price;
-        }
-        else {
-            $order_data->{rrp} = $price / ( 1 + $order_data->{tax_rate} );
+            $order_data->{rrp}   = $price;
+        } else {
+            $order_data->{rrp}   = $price / ( 1 + $order_data->{tax_rate} );
             $order_data->{ecost} = $order_data->{rrp} * ( 1 - $discount );
         }
         $order_data->{listprice} = $order_data->{rrp} / $active_currency->rate;
         $order_data->{unitprice} = $order_data->{ecost};
         $order_data->{total}     = $order_data->{ecost} * $quantity;
-    }
-    else {
+    } else {
         $order_data->{listprice} = 0;
     }
 
     return $order_data;
 }
 
-sub _check_fund_code {
-    my ( $self, $gobi_order ) = @_;
-
-    my $schema = Koha::Database->new()->schema();
-
-    # We actually call it fund
-    my $budget_code = $gobi_order->OrderDetail->{FundCode};
-
-    # Check budget is active !
-    my $period_rs = $schema->resultset('Aqbudgetperiod')->search( { budget_period_active => 1, } );
-
-    # Check the fund code exists and is active
-    my $budget = $schema->resultset('Aqbudget')->single(
-        {   budget_code      => $budget_code,
-            budget_period_id => { -in => $period_rs->get_column('budget_period_id')->as_query },
-        }
-    );
-
-    if ( !defined $budget ) {
-
-        # Raise an exception the passed fund is not valid
-        GOBI::Exception->throw("Fund code $budget_code is invalid");
-    }
-
-    return $budget->id;
-}
-
-=head2 _check_library_code
-
-    my $library_id = $plugin->_check_library_code($library_code);
-
-Checks if the passed library code is valid. Throws I<GOBI::Exception>
-if it isn't.
-
-=cut
-
-sub _check_library_code {
-    my ( $self, $library_code ) = @_;
-
-    GOBI::Exception->throw("Missing library id.")
-        unless defined $library_id;
-
-    GOBI::Exception->throw("Invalid library code passed ($library_code)")
-        unless Koha::Libraries->find($library_code);
-
-    return $library_code;
-}
-
-sub _check_currency {
-    my ( $self, $gobi_order ) = @_;
-
-    # We actually call it fund
-    my $currency = $gobi_order->OrderDetail->{ListPriceCurrency};
-
-    GOBI::Exception->throw("Missing currency code.")
-        unless defined $currency;
-
-    GOBI::Exception->throw("Invalid currency passed ($currency)")
-        unless Koha::Acquisition::Currencies->find($currency);
-
-    return $currency;
-}
-
-sub _check_item_type {
-    my ( $self, $gobi_order ) = @_;
-
-    my $item_type = $gobi_order->item_type;
-
-    GOBI::Exception->throw("Missing item type.")
-        unless defined $item_type;
-
-    GOBI::Exception->throw("Invalid item type passed ($item_type)")
-        unless Koha::ItemTypes->find($item_type);
-
-    return $item_type;
-}
-
 sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
 
-    my $template = $self->get_template({ file => 'configure.tt' });
+    my $template = $self->get_template( { file => 'configure.tt' } );
 
-    my $api_key   = $self->retrieve_data( 'api_key'   );
-    my $vendor_id = $self->retrieve_data( 'vendor_id' );
-    my $patron_id = $self->retrieve_data( 'patron_id' );
-    my $not_loan  = $self->retrieve_data( 'not_loan'  );
-    my $lpm_sort1 = $self->retrieve_data( 'lpm_sort1' );
-    my $lpm_sort2 = $self->retrieve_data( 'lpm_sort2' );
-    my $upm_sort1 = $self->retrieve_data( 'upm_sort1' );
-    my $upm_sort2 = $self->retrieve_data( 'upm_sort2' );
-    my $lps_sort1 = $self->retrieve_data( 'lps_sort1' );
-    my $lps_sort2 = $self->retrieve_data( 'lps_sort2' );
-    my $ups_sort1 = $self->retrieve_data( 'ups_sort1' );
-    my $ups_sort2 = $self->retrieve_data( 'ups_sort2' );
-    my $lem_sort1 = $self->retrieve_data( 'lem_sort1' );
-    my $lem_sort2 = $self->retrieve_data( 'lem_sort2' );
-    my $les_sort1 = $self->retrieve_data( 'les_sort1' );
-    my $les_sort2 = $self->retrieve_data( 'les_sort2' );
-    my $marc_mod_template = $self->retrieve_data('marc_mod_template');
-    my $create_item_for_electronic_resources = $self->retrieve_data( 'create_item_for_electronic_resources' );
-    my $add_nonpublic_item_notes = $self->retrieve_data( 'add_nonpublic_item_notes' );
+    my $api_key                              = $self->retrieve_data('api_key');
+    my $vendor_id                            = $self->retrieve_data('vendor_id');
+    my $patron_id                            = $self->retrieve_data('patron_id');
+    my $not_loan                             = $self->retrieve_data('not_loan');
+    my $lpm_sort1                            = $self->retrieve_data('lpm_sort1');
+    my $lpm_sort2                            = $self->retrieve_data('lpm_sort2');
+    my $upm_sort1                            = $self->retrieve_data('upm_sort1');
+    my $upm_sort2                            = $self->retrieve_data('upm_sort2');
+    my $lps_sort1                            = $self->retrieve_data('lps_sort1');
+    my $lps_sort2                            = $self->retrieve_data('lps_sort2');
+    my $ups_sort1                            = $self->retrieve_data('ups_sort1');
+    my $ups_sort2                            = $self->retrieve_data('ups_sort2');
+    my $lem_sort1                            = $self->retrieve_data('lem_sort1');
+    my $lem_sort2                            = $self->retrieve_data('lem_sort2');
+    my $les_sort1                            = $self->retrieve_data('les_sort1');
+    my $les_sort2                            = $self->retrieve_data('les_sort2');
+    my $marc_mod_template                    = $self->retrieve_data('marc_mod_template');
+    my $create_item_for_electronic_resources = $self->retrieve_data('create_item_for_electronic_resources');
+    my $add_nonpublic_item_notes             = $self->retrieve_data('add_nonpublic_item_notes');
 
     $template->param(
-        api_key   => $api_key,
-        vendor_id => $vendor_id,
-        patron_id => $patron_id,
-        not_loan  => $not_loan,
-        lpm_sort1 => $lpm_sort1,
-        lpm_sort2 => $lpm_sort2,
-        upm_sort1 => $upm_sort1,
-        upm_sort2 => $upm_sort2,
-        lps_sort1 => $lps_sort1,
-        lps_sort2 => $lps_sort2,
-        ups_sort1 => $ups_sort1,
-        ups_sort2 => $ups_sort2,
-        lem_sort1 => $lem_sort1,
-        lem_sort2 => $lem_sort2,
-        les_sort1 => $les_sort1,
-        les_sort2 => $les_sort2,
+        api_key                              => $api_key,
+        vendor_id                            => $vendor_id,
+        patron_id                            => $patron_id,
+        not_loan                             => $not_loan,
+        lpm_sort1                            => $lpm_sort1,
+        lpm_sort2                            => $lpm_sort2,
+        upm_sort1                            => $upm_sort1,
+        upm_sort2                            => $upm_sort2,
+        lps_sort1                            => $lps_sort1,
+        lps_sort2                            => $lps_sort2,
+        ups_sort1                            => $ups_sort1,
+        ups_sort2                            => $ups_sort2,
+        lem_sort1                            => $lem_sort1,
+        lem_sort2                            => $lem_sort2,
+        les_sort1                            => $les_sort1,
+        les_sort2                            => $les_sort2,
         create_item_for_electronic_resources => $create_item_for_electronic_resources,
-        add_nonpublic_item_notes => $add_nonpublic_item_notes,
-        marc_mod_template => $marc_mod_template,
+        add_nonpublic_item_notes             => $add_nonpublic_item_notes,
+        marc_mod_template                    => $marc_mod_template,
     );
 
-    print $cgi->header( -charset => 'utf-8' );
-    print $template->output();
+    $self->output_html( $template->output() );
 }
 
 sub _configure {
@@ -697,43 +596,42 @@ sub _configure {
     my $patron_id = $cgi->param('patron_id');
     my $not_loan  = $cgi->param('not_loan');
 
-    my $lpm_sort1 = $cgi->param('lpm_sort1') // q{};
-    my $lpm_sort2 = $cgi->param('lpm_sort2') // q{};
-    my $upm_sort1 = $cgi->param('upm_sort1') // q{};
-    my $upm_sort2 = $cgi->param('upm_sort2') // q{};
-    my $lps_sort1 = $cgi->param('lps_sort1') // q{};
-    my $lps_sort2 = $cgi->param('lps_sort2') // q{};
-    my $ups_sort1 = $cgi->param('ups_sort1') // q{};
-    my $ups_sort2 = $cgi->param('ups_sort2') // q{};
-    my $lem_sort1 = $cgi->param('lem_sort1') // q{};
-    my $lem_sort2 = $cgi->param('lem_sort2') // q{};
-    my $les_sort1 = $cgi->param('les_sort1') // q{};
-    my $les_sort2 = $cgi->param('les_sort2') // q{};
-    my $marc_mod_template = $cgi->param('marc_mod_template') // q{};
+    my $lpm_sort1                            = $cgi->param('lpm_sort1')                            // q{};
+    my $lpm_sort2                            = $cgi->param('lpm_sort2')                            // q{};
+    my $upm_sort1                            = $cgi->param('upm_sort1')                            // q{};
+    my $upm_sort2                            = $cgi->param('upm_sort2')                            // q{};
+    my $lps_sort1                            = $cgi->param('lps_sort1')                            // q{};
+    my $lps_sort2                            = $cgi->param('lps_sort2')                            // q{};
+    my $ups_sort1                            = $cgi->param('ups_sort1')                            // q{};
+    my $ups_sort2                            = $cgi->param('ups_sort2')                            // q{};
+    my $lem_sort1                            = $cgi->param('lem_sort1')                            // q{};
+    my $lem_sort2                            = $cgi->param('lem_sort2')                            // q{};
+    my $les_sort1                            = $cgi->param('les_sort1')                            // q{};
+    my $les_sort2                            = $cgi->param('les_sort2')                            // q{};
+    my $marc_mod_template                    = $cgi->param('marc_mod_template')                    // q{};
     my $create_item_for_electronic_resources = $cgi->param('create_item_for_electronic_resources') // 0;
-    my $add_nonpublic_item_notes = $cgi->param('add_nonpublic_item_notes') // 0;
-
+    my $add_nonpublic_item_notes             = $cgi->param('add_nonpublic_item_notes')             // 0;
 
     # Store new API key
-    $self->store_data({ 'api_key'   => $api_key   });
-    $self->store_data({ 'vendor_id' => $vendor_id });
-    $self->store_data({ 'patron_id' => $patron_id });
-    $self->store_data({ 'not_loan'  => $not_loan  });
-    $self->store_data({ 'lpm_sort1' => $lpm_sort1 });
-    $self->store_data({ 'lpm_sort2' => $lpm_sort2 });
-    $self->store_data({ 'upm_sort1' => $upm_sort1 });
-    $self->store_data({ 'upm_sort2' => $upm_sort2 });
-    $self->store_data({ 'lps_sort1' => $lps_sort1 });
-    $self->store_data({ 'lps_sort2' => $lps_sort2 });
-    $self->store_data({ 'ups_sort1' => $ups_sort1 });
-    $self->store_data({ 'ups_sort2' => $ups_sort2 });
-    $self->store_data({ 'lem_sort1' => $lem_sort1 });
-    $self->store_data({ 'lem_sort2' => $lem_sort2 });
-    $self->store_data({ 'les_sort1' => $les_sort1 });
-    $self->store_data({ 'les_sort2' => $les_sort2 });
-    $self->store_data({ 'create_item_for_electronic_resources' => $create_item_for_electronic_resources });
-    $self->store_data({ 'add_nonpublic_item_notes' => $add_nonpublic_item_notes });
-    $self->store_data({ marc_mod_template => $marc_mod_template });
+    $self->store_data( { 'api_key'                              => $api_key } );
+    $self->store_data( { 'vendor_id'                            => $vendor_id } );
+    $self->store_data( { 'patron_id'                            => $patron_id } );
+    $self->store_data( { 'not_loan'                             => $not_loan } );
+    $self->store_data( { 'lpm_sort1'                            => $lpm_sort1 } );
+    $self->store_data( { 'lpm_sort2'                            => $lpm_sort2 } );
+    $self->store_data( { 'upm_sort1'                            => $upm_sort1 } );
+    $self->store_data( { 'upm_sort2'                            => $upm_sort2 } );
+    $self->store_data( { 'lps_sort1'                            => $lps_sort1 } );
+    $self->store_data( { 'lps_sort2'                            => $lps_sort2 } );
+    $self->store_data( { 'ups_sort1'                            => $ups_sort1 } );
+    $self->store_data( { 'ups_sort2'                            => $ups_sort2 } );
+    $self->store_data( { 'lem_sort1'                            => $lem_sort1 } );
+    $self->store_data( { 'lem_sort2'                            => $lem_sort2 } );
+    $self->store_data( { 'les_sort1'                            => $les_sort1 } );
+    $self->store_data( { 'les_sort2'                            => $les_sort2 } );
+    $self->store_data( { 'create_item_for_electronic_resources' => $create_item_for_electronic_resources } );
+    $self->store_data( { 'add_nonpublic_item_notes'             => $add_nonpublic_item_notes } );
+    $self->store_data( { marc_mod_template                      => $marc_mod_template } );
 
     $self->_list_orders();
 }
@@ -754,7 +652,7 @@ sub order_type_to_sort_value {
         unless exists $sort_mapping->{ $order->type };
 
     my $variable = $sort_mapping->{ $order->type } . "_$sort";
-    my $value    = $self->retrieve_data( $variable ) // q{};
+    my $value    = $self->retrieve_data($variable) // q{};
 
     return $value;
 }
@@ -764,7 +662,8 @@ sub install {
 
     my $po_table = $self->get_qualified_table_name('purchase_orders');
 
-    C4::Context->dbh->do(qq{
+    C4::Context->dbh->do(
+        qq{
         CREATE TABLE $po_table (
           `id` INT(11) NOT NULL auto_increment,
           `status` TEXT,
@@ -775,7 +674,8 @@ sub install {
           KEY basketno ( basketno),
           CONSTRAINT gobipo_basketno FOREIGN KEY ( basketno ) REFERENCES aqbasket ( basketno ) ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-    }) unless C4::Installer::TableExists($po_table);
+    }
+    ) unless C4::Installer::TableExists($po_table);
 
     return 1;
 }
@@ -789,13 +689,15 @@ sub upgrade {
 
         my $po_table = $self->get_qualified_table_name('purchase_orders');
 
-        C4::Context->dbh->do(qq{
+        C4::Context->dbh->do(
+            qq{
             ALTER TABLE $po_table
                 ADD COLUMN `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 AFTER `raw_msg`;
-        });
+        }
+        );
 
-        $self->store_data({ '__INSTALLED_VERSION__' => "1.3.0" });
+        $self->store_data( { '__INSTALLED_VERSION__' => "1.3.0" } );
     }
 
     if ( $self->_version_compare( $database_version, "2.0.1" ) == -1 ) {
@@ -836,6 +738,175 @@ sub uninstall {
     my ( $self, $args ) = @_;
 
     return 1;
+}
+
+=head2 Internal methods
+
+=head3 set_managing_library
+
+    $plugin->set_managing_library(
+        {
+            basket_id           => $basket_id,
+            managing_library_id => $managing_library_id,
+        }
+    );
+
+Links the I<$basket_id> to a I<$managing_library_id>. Warns if the library
+is not found.
+
+=cut
+
+sub set_managing_library {
+    my ( $self, $params ) = @_;
+
+    $self->validate_params(
+        {
+            required => [qw(basket_id managing_library_id)],
+            params   => $params,
+        }
+    );
+
+    # Attempt to set the managing library
+    try {
+        $self->check_library_code( $params->{managing_library_id} );
+        ModBasket(
+            {
+                basketno => $params->{basket_id},
+                branch   => $params->{managing_library_id},
+            }
+        );
+    } catch {
+        $self->gobi_warn( sprintf( "Could not link to managing library '%s': %s", $params->{managing_library}, $_ ) );
+    };
+
+    return $self;
+}
+
+=head3 gobi_warn
+
+    $self->gobi_warn($string);
+
+Prints the passed string to STDERR with an identifiable label for GOBI.
+
+=cut
+
+sub gobi_warn {
+    my ( $self, $string ) = @_;
+    print STDERR sprintf( "[GOBI] %s", $string // '<empty>' );
+}
+
+=head3 validate_params
+
+    $self->validate_params( { required => $required, params => $params } );
+
+Reusable method for validating the passed parameters with a list of
+required params.
+
+=cut
+
+sub validate_params {
+    my ( $self, $args ) = @_;
+
+    foreach my $param ( @{ $args->{required} } ) {
+        GOBI::Exception::MissingParameter->throw( parameter => $param )
+            unless exists $args->{params}->{$param};
+    }
+
+    return;
+}
+
+=head2 check_library_code
+
+    my $library_id = $plugin->check_library_code($library_code);
+
+Checks if the passed library code is valid. Throws I<GOBI::Exception>
+if it isn't.
+
+=cut
+
+sub check_library_code {
+    my ( $self, $library_id ) = @_;
+
+    GOBI::Exception::MissingParameter->throw( parameter => 'library_id' )
+        unless $library_id;
+
+    GOBI::Exception::InvalidLibrary->throw( library_id => $library_id )
+        unless Koha::Libraries->find($library_id);
+
+    return $library_id;
+}
+
+=head2 check_item_type
+
+    my $item_type = $plugin->check_item_type($item_ype);
+
+Checks if the passed I<$item_type> is valid. Throws I<GOBI::Exception::InvalidItemType>
+if it isn't.
+
+=cut
+
+sub check_item_type {
+    my ( $self, $item_type ) = @_;
+
+    GOBI::Exception::MissingParameter->throw( parameter => 'item_type' )
+        unless $item_type;
+
+    GOBI::Exception::InvalidItemType->throw( item_type => $item_type )
+        unless Koha::ItemTypes->find($item_type);
+
+    return $item_type;
+}
+
+=head2 check_currency
+
+    my $currency = $plugin->check_currency($currency);
+
+Checks if the passed I<$item_type> is valid. Throws I<GOBI::Exception::InvalidItemType>
+if it isn't.
+
+=cut
+
+sub check_currency {
+    my ( $self, $currency ) = @_;
+
+    GOBI::Exception::MissingParameter->throw( parameter => 'currency' )
+        unless $currency;
+
+    GOBI::Exception::InvalidCurrency->throw( currency => $currency )
+        unless Koha::Acquisition::Currencies->find($currency);
+
+    return $currency;
+}
+
+=head2 check_fund_code
+
+    my $fund_id = $plugin->check_fund_code($fund_code);
+
+Checks if the passed I<$fund_code> is valid. Throws I<GOBI::Exception::InvalidFundCode>
+if it isn't.
+
+=cut
+
+sub check_fund_code {
+    my ( $self, $fund_code ) = @_;
+
+    my $schema = Koha::Database->new()->schema();
+
+    # Check budget is active !
+    my $period_rs = $schema->resultset('Aqbudgetperiod')->search( { budget_period_active => 1, } );
+
+    # Check the fund code exists and is active
+    my $budget = $schema->resultset('Aqbudget')->single(
+        {
+            budget_code      => $fund_code,
+            budget_period_id => { -in => $period_rs->get_column('budget_period_id')->as_query },
+        }
+    );
+
+    GOBI::Exception::InvalidFund->throw( fund_code => $fund_code )
+        unless $budget;
+
+    return $budget->id;
 }
 
 1;

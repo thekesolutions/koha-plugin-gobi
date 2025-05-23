@@ -19,8 +19,38 @@ package Koha::Plugin::Com::Theke::GOBI::Exception;
 
 use Modern::Perl;
 
+use Koha::Exceptions;
+
 use Exception::Class (
-    'GOBI::Exception',
+    'GOBI::Exception' => {
+        isa         => 'Koha::Exception',
+        description => 'Generic GOBI exception',
+    },
+    'GOBI::Exception::InvalidCurrency' => {
+        isa         => 'GOBI::Exception',
+        description => 'The passed item type is invalid',
+        fields      => ['currency']
+    },
+    'GOBI::Exception::InvalidFund' => {
+        isa         => 'GOBI::Exception',
+        description => 'The passed fund code is invalid',
+        fields      => ['fund_code']
+    },
+    'GOBI::Exception::InvalidItemType' => {
+        isa         => 'GOBI::Exception',
+        description => 'The passed item type is invalid',
+        fields      => ['item_type']
+    },
+    'GOBI::Exception::InvalidLibrary' => {
+        isa         => 'GOBI::Exception',
+        description => 'The passed library ID is invalid',
+        fields      => ['library_id']
+    },
+    'GOBI::Exception::MissingParameter' => {
+        isa         => 'GOBI::Exception',
+        description => 'Mandatory parameter missing',
+        fields      => ['parameter'],
+    },
     'GOBI::Exceptions::CustomerDetailNotFound' => {
         isa         => 'GOBI::Exception',
         description => 'Mandatory CustomerDetail not found'
