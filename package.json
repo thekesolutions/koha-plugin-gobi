@@ -1,8 +1,14 @@
 {
   "name": "koha-plugin-gobi",
-  "version": "3.1.3",
+  "version": "3.1.4",
   "description": "Koha GOBI plugin for automated acquisitions workflow",
-  "keywords": ["koha", "plugin", "gobi", "acquisitions", "library"],
+  "keywords": [
+    "koha",
+    "plugin",
+    "gobi",
+    "acquisitions",
+    "library"
+  ],
   "homepage": "https://github.com/thekesolutions/koha-plugin-gobi",
   "bugs": {
     "url": "https://github.com/thekesolutions/koha-plugin-gobi/issues"

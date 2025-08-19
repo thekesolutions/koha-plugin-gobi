@@ -52,7 +52,7 @@ use Try::Tiny;
 use MARC::Record;
 
 ## Here we set our plugin version
-our $VERSION = "3.1.3";
+our $VERSION = "3.1.4";
 
 our $metadata = {
     name            => 'GOBI integration',
