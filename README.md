@@ -6,102 +6,93 @@
 
 ## Introduction
 
-This plugin is designed to provide an easy integration for the _GOBI Library Solutions from EBSCO_.
-It registers purchase orders into _Koha_ based on the GOBI message it receives
+This plugin provides integration with _GOBI Library Solutions from EBSCO_ for automated acquisitions workflow. It processes purchase orders from GOBI and creates corresponding records in Koha.
 
-It is intended to serve as a testbed so the feature can get into _Koha_'s source code.
+_GOBI_ messages include a basic MARC21 record for purchased items. This record is added to Koha and linked to the generated purchase order.
 
-_GOBI_ messages include a basic MARC21 record for the purchased item(s). This MARC21 record is added to
-_Koha_ and linked to the generated purchase.
-
-It follows the implicit _Koha_ workflow, which includes:
-1. Parse GOBI purchase order.
-2. Verify the GOBI order includes mandatory data and valid.
-3. Create a purchase basket.
-4. Store the GOBI order in the plugin's table, including the basketno
+The plugin follows the standard Koha acquisitions workflow:
+1. Parse GOBI purchase order
+2. Verify order data and validity
+3. Create a purchase basket
+4. Store the GOBI order in the plugin's table
 5. Add MARC record
-6. Add the required items (based on _quantity_) if **AcqCreateItem** is set to ordering.
-7. Create an order, attach the items
+6. Add required items (based on quantity) if **AcqCreateItem** is set to ordering
+7. Create an order and attach items
 8. Close the purchase basket
 
-## Install and setup
+## Installation
 
-The plugin system needs to be turned on by a system administrator.
+### Method 1: Plugin Search (Recommended)
 
-To set up the Koha plugin system you must first make some changes to your install.
+If your system administrator has configured Theke's GitHub organization in `koha-conf.xml`:
 
-* Change `<enable_plugins>0<enable_plugins>` to `<enable_plugins>1</enable_plugins>` in your koha-conf.xml file
-* Confirm that the path to `<pluginsdir>` exists, is correct, and is writable by the web server
-* Restart _memcached_:
+1. Go to **Administration → Plugins**
+2. Search for "gobi"
+3. Install directly from the search results
 
-```shell
-$ sudo systemctl restart memcached.service
+### Method 2: Manual Download
+
+1. Download the latest `.kpz` file from the [releases page](https://github.com/thekesolutions/koha-plugin-gobi/releases)
+2. Go to **Administration → Plugins**
+3. Upload the `.kpz` file
+4. Enable the plugin
+
+### System Requirements
+
+Ensure plugins are enabled in your Koha installation:
+- Set `<enable_plugins>1</enable_plugins>` in `koha-conf.xml`
+- Verify `<pluginsdir>` path exists and is writable
+- Restart memcached and koha-common services
+
+## Configuration
+
+### Koha Setup
+1. Create a **GOBI vendor** in Koha (note the vendor ID)
+2. Create a **GOBI patron** in Koha (note the patron ID)
+3. Go to the plugin configuration page
+4. Enter the vendor ID in the **GOBI vendor id** field
+5. Generate an API key using the refresh icon
+6. Configure the 'Not for loan' value as needed
+7. Save configuration
+
+### GOBI Setup
+Provide your GOBI representative with:
+- The generated **API key**
+- Your **staff client URL** (HTTPS required)
+- CSV files containing:
+  - Branch codes and names (for Location)
+  - Fund IDs and names (for FundCode)
+  - Item type IDs and descriptions (for Local Data 1)
+  - Shelving location codes and descriptions (for Local Data 2)
+
+### Currency Requirements
+GOBI supports **USD** and **GBP** currency codes. Ensure these are configured in Koha.
+
+## Testing
+
+Test the API endpoint:
+```bash
+curl http://your-koha-site/api/v1/gobi/orders
 ```
 
-* Restart _koha-common_:
-
-```shell
-$ sudo systemctl restart koha-common.service
+Expected response (API key missing error indicates the endpoint is working):
+```xml
+<Response><Error><Code>API_KEY_MISSING</Code></Error></Response>
 ```
-
-Download the .kpz file from the [releases page](https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi/-/releases).
-Then upload the _kpz_ file in the plugins administration page.
-
-Then restart _koha-common_ again:
-```
-$ sudo systemctl restart koha-common.service
-```
-
-You can test it is accessible using _curl_ like this from the command line:
-```
-vagrant@kohadevbox:~$ curl http://localhost:8080/api/v1/gobi/orders
-<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Error>
-        <Code>API_KEY_MISSING</Code>
-        <Message>API Key parameter missing on request.</Message>
-    </Error>
-</Response>
-```
-
-If you get a response from the api, you are on the right track.
-
-## Configure the plugin
-
-* Create a **GOBI vendor** in Koha. Pick the vendor id (*booksellerid* on the URL).
-* Create a **GOBI patron** in Koha. Pick the patron id (*borrowernumber* on the URL).
-* Go to the plugin configuration page. Put the *vendor id* on the **GOBI vendor id** field.
-* Generate an API key by clicking on the refresh icon.
-* Set the 'Not for loan' value to suit your needs.
-* Save.
-
-## Configure GOBI
-
-Your GOBI representative will require the following information:
-
-* The generated **API key**
-* The URL for your **staff client** (HTTPS is mandatory for security reasons)
-
-You will need to send GOBI some CSV files, each containing:
-
-* **branchcode** and **branchname** (for use in *Location*).
-* **fund ids** and **fund names** (for use in *FundCode*).
-* **item type ids** and **item type descriptions** (for use in *Local Data 1*).
-* **shelving location codes** and **shelving location descriptions** (for use in *Local Data 2*).
-
-### Currencies
-
-_GOBI_ handles **USD** and **GBP** as currency codes. They need to be set likewise in Koha.
 
 ## Notes
 
-* _GOBI_ only accepts the *<POLineNumber>* value in the response message. Because of this, and in order
-  to be able to match the full record using 999$c later (once the full record is submitted), the plugin 
-  returns the resulting **biblionumber** on that field until _GOBI_ accepts more information to be returned.
-* It is not clear if _GOBI_ price includes taxes, and which percentage.
-* We are not checking if funds are enough and what to do in that case.
-* _GOBI_ orders visualization needs some love, based on users input.
+- GOBI only accepts `<POLineNumber>` in response messages
+- The plugin returns the **biblionumber** in this field for record matching
+- Tax handling and fund availability checking may need customization
+- GOBI orders visualization can be enhanced based on user feedback
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/thekesolutions/koha-plugin-gobi/issues)
+- **Documentation**: See plugin configuration page in Koha
+- **Commercial Support**: [Theke Solutions](https://theke.io)
 
 ## License
 
-See the LICENSE file on the root directory.
+GPL-3.0-or-later. See the LICENSE file for details.
