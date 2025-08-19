@@ -1,4 +1,4 @@
-image: "node:12-alpine"
+image: "node:22-alpine"
 
 stages: 
   - release
@@ -13,10 +13,194 @@ build:
     - apk add --update zip curl jq
     - npm install
     - npm install -g gulp-cli
+    
+    # Environment validation
+    - |
+      echo "=== Environment Information ==="
+      echo "Tag: $CI_COMMIT_TAG"
+      echo "Project: $CI_PROJECT_ID"
+      echo "Node: $(node --version)"
+      echo "NPM: $(npm --version)"
+    
+    # Build the plugin
+    - echo "=== Building Plugin ==="
     - gulp build
-    - "UPLOAD_URL=$(curl --request POST --header \"PRIVATE-TOKEN: $PRIVATE_TOKEN\" --form \"file=@$(npm run kpz -s)\" $CI_API_V4_URL/projects/$CI_PROJECT_ID/uploads | jq -r \".url\" )"
-    - "curl --header \"Content-Type: application/json\" --header \"PRIVATE-TOKEN: $PRIVATE_TOKEN\" --data \"{ \\\"name\\\": \\\"$(npm run print-name -s)\\\", \\\"tag_name\\\": \\\"$CI_COMMIT_TAG\\\", \\\"description\\\":  \\\"release $CI_COMMIT_TAG\\\", \\\"assets\\\": { \\\"links\\\": [{ \\\"name\\\": \\\"$(npm run print-name -s)\\\", \\\"url\\\": \\\"$CI_PROJECT_URL$UPLOAD_URL\\\" }] } }\" --request POST $CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
-    - "curl --header \"JOB-TOKEN: $CI_JOB_TOKEN\" --upload-file ${PLUGIN_NAME}-${CI_COMMIT_TAG}.${PLUGIN_EXTENSION} ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PLUGIN_NAME}/${CI_COMMIT_TAG}/${PLUGIN_NAME}-${CI_COMMIT_TAG}.${PLUGIN_EXTENSION}"
+    
+    # Verify build output
+    - |
+      echo "=== Build Verification ==="
+      find . -name "*.kpz" -type f -exec ls -la {} \;
+    
+    # Get plugin information
+    - PLUGIN_FILE="$(npm run kpz -s)"
+    - PLUGIN_NAME_CLEAN="$(npm run print-name -s)"
+    
+    # Validate build output
+    - |
+      echo "=== Build Validation ==="
+      echo "Plugin file: $PLUGIN_FILE"
+      echo "Plugin name: $PLUGIN_NAME_CLEAN"
+      
+      if [ ! -f "$PLUGIN_FILE" ]; then
+        echo "ERROR: Plugin file not found: $PLUGIN_FILE"
+        echo "Available files:"
+        ls -la *.kpz 2>/dev/null || echo "No .kpz files found"
+        exit 1
+      fi
+      
+      echo "✅ Plugin file verified: $PLUGIN_FILE"
+      ls -la "$PLUGIN_FILE"
+    
+    # Validate authentication
+    - |
+      echo "=== Authentication Validation ==="
+      
+      if [ -z "$PRIVATE_TOKEN" ]; then
+        echo "ERROR: PRIVATE_TOKEN not configured"
+        exit 1
+      fi
+      
+      if [ -z "$CI_JOB_TOKEN" ]; then
+        echo "ERROR: CI_JOB_TOKEN not available"
+        exit 1
+      fi
+      
+      echo "✅ Authentication tokens configured"
+    
+    # Test API connectivity
+    - |
+      echo "=== API Connectivity Test ==="
+      
+      API_RESPONSE=$(curl --silent --show-error --write-out "HTTPSTATUS:%{http_code}" \
+        --header "PRIVATE-TOKEN: $PRIVATE_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID")
+      
+      API_BODY=$(echo "$API_RESPONSE" | sed -E 's/HTTPSTATUS\:[0-9]{3}$//')
+      API_CODE=$(echo "$API_RESPONSE" | tr -d '\n' | sed -E 's/.*HTTPSTATUS:([0-9]{3})$/\1/')
+      
+      if [ "$API_CODE" = "200" ]; then
+        echo "✅ API connectivity verified"
+        PROJECT_NAME=$(echo "$API_BODY" | jq -r '.name // "unknown"')
+        echo "Project: $PROJECT_NAME"
+      else
+        echo "ERROR: API connectivity failed (HTTP $API_CODE)"
+        echo "Response: $API_BODY"
+        exit 1
+      fi
+    
+    # Upload plugin file
+    - |
+      echo "=== Uploading Plugin File ==="
+      
+      UPLOAD_RESPONSE=$(curl --silent --show-error --write-out "HTTPSTATUS:%{http_code}" \
+        --request POST \
+        --header "PRIVATE-TOKEN: $PRIVATE_TOKEN" \
+        --form "file=@$PLUGIN_FILE" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/uploads")
+      
+      UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed -E 's/HTTPSTATUS\:[0-9]{3}$//')
+      UPLOAD_CODE=$(echo "$UPLOAD_RESPONSE" | tr -d '\n' | sed -E 's/.*HTTPSTATUS:([0-9]{3})$/\1/')
+      
+      if [ "$UPLOAD_CODE" = "201" ]; then
+        echo "✅ File uploaded successfully"
+        
+        UPLOAD_URL=$(echo "$UPLOAD_BODY" | jq -r '.url')
+        
+        if [ "$UPLOAD_URL" = "null" ] || [ -z "$UPLOAD_URL" ]; then
+          echo "ERROR: Failed to extract upload URL"
+          echo "Response: $UPLOAD_BODY"
+          exit 1
+        fi
+        
+        echo "Upload URL: $UPLOAD_URL"
+      else
+        echo "ERROR: File upload failed (HTTP $UPLOAD_CODE)"
+        echo "Response: $UPLOAD_BODY"
+        exit 1
+      fi
+    
+    # Create GitLab release
+    - |
+      echo "=== Creating Release ==="
+      
+      # Prepare release data
+      PLUGIN_NAME_ESCAPED=$(echo "$PLUGIN_NAME_CLEAN" | sed 's/"/\\"/g' | sed "s/'/\\'/g")
+      ASSET_URL="$CI_PROJECT_URL$UPLOAD_URL"
+      
+      # Generate release JSON
+      RELEASE_DATA=$(jq -n \
+        --arg name "$PLUGIN_NAME_ESCAPED" \
+        --arg tag "$CI_COMMIT_TAG" \
+        --arg desc "Release $CI_COMMIT_TAG" \
+        --arg asset_name "$PLUGIN_NAME_ESCAPED" \
+        --arg asset_url "$ASSET_URL" \
+        '{
+          name: $name,
+          tag_name: $tag,
+          description: $desc,
+          assets: {
+            links: [{
+              name: $asset_name,
+              url: $asset_url,
+              link_type: "package"
+            }]
+          }
+        }')
+      
+      # Create release
+      RELEASE_RESPONSE=$(curl --silent --show-error --write-out "HTTPSTATUS:%{http_code}" \
+        --header "Content-Type: application/json" \
+        --header "PRIVATE-TOKEN: $PRIVATE_TOKEN" \
+        --data "$RELEASE_DATA" \
+        --request POST \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases")
+      
+      RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed -E 's/HTTPSTATUS\:[0-9]{3}$//')
+      RELEASE_CODE=$(echo "$RELEASE_RESPONSE" | tr -d '\n' | sed -E 's/.*HTTPSTATUS:([0-9]{3})$/\1/')
+      
+      if [ "$RELEASE_CODE" = "201" ]; then
+        echo "✅ Release created successfully"
+        RELEASE_TAG=$(echo "$RELEASE_BODY" | jq -r '.tag_name')
+        echo "Release: $RELEASE_TAG"
+      else
+        echo "ERROR: Release creation failed (HTTP $RELEASE_CODE)"
+        echo "Response: $RELEASE_BODY"
+        
+        ERROR_MESSAGE=$(echo "$RELEASE_BODY" | jq -r '.message // .error // "Unknown error"')
+        echo "Error: $ERROR_MESSAGE"
+        exit 1
+      fi
+    
+    # Upload to Package Registry
+    - |
+      echo "=== Uploading to Package Registry ==="
+      
+      PACKAGE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PLUGIN_NAME_CLEAN/$CI_COMMIT_TAG/$PLUGIN_FILE"
+      
+      PACKAGE_RESPONSE=$(curl --silent --show-error --write-out "HTTPSTATUS:%{http_code}" \
+        --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file "$PLUGIN_FILE" \
+        "$PACKAGE_URL")
+      
+      PACKAGE_BODY=$(echo "$PACKAGE_RESPONSE" | sed -E 's/HTTPSTATUS\:[0-9]{3}$//')
+      PACKAGE_CODE=$(echo "$PACKAGE_RESPONSE" | tr -d '\n' | sed -E 's/.*HTTPSTATUS:([0-9]{3})$/\1/')
+      
+      if [ "$PACKAGE_CODE" = "201" ]; then
+        echo "✅ Package uploaded successfully"
+      else
+        echo "ERROR: Package upload failed (HTTP $PACKAGE_CODE)"
+        echo "Response: $PACKAGE_BODY"
+        exit 1
+      fi
+    
+    # Release summary
+    - |
+      echo "=== Release Complete ==="
+      echo "Plugin: $PLUGIN_NAME_CLEAN"
+      echo "Version: $CI_COMMIT_TAG"
+      echo "File: $PLUGIN_FILE"
+      echo "Release: $CI_PROJECT_URL/-/releases/$CI_COMMIT_TAG"
+      echo "Packages: $CI_PROJECT_URL/-/packages"
 
   only:
     - tags
