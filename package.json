@@ -1,28 +1,69 @@
 {
   "name": "koha-plugin-gobi",
   "version": "3.1.3",
-  "description": "Koha GOBI plugin",
-  "devDependencies": {
-    "gulp": "^4.0.2",
-    "gulp-cli": "^3.0.0"
-  },
-  "scripts": {
-    "preversion": "sed -i -e \"s/^our \\$VERSION = .*/our \\$VERSION = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/Theke/GOBI.pm; git add -u; rm Koha/Plugin/Com/Theke/GOBI.pm-e",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "kpz": "echo -n ${npm_package_name}-v${npm_package_version}.kpz",
-    "print-name": "echo -n ${npm_package_name}"
+  "description": "Koha GOBI plugin for automated acquisitions workflow",
+  "keywords": ["koha", "plugin", "gobi", "acquisitions", "library"],
+  "homepage": "https://github.com/thekesolutions/koha-plugin-gobi",
+  "bugs": {
+    "url": "https://github.com/thekesolutions/koha-plugin-gobi/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi.git"
+    "url": "git+https://github.com/thekesolutions/koha-plugin-gobi.git"
   },
-  "author": "Tomás Cohen Arazi <tomascohen@theke.io>",
-  "license": "GPL-3.0",
-  "bugs": {
-    "url": "https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi/issues"
+  "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "Tomás Cohen Arazi",
+    "email": "tomascohen@theke.io",
+    "url": "https://theke.io"
   },
-  "homepage": "https://gitlab.com/thekesolutions/plugins/koha-plugin-gobi",
+  "contributors": [
+    {
+      "name": "Theke Solutions",
+      "url": "https://theke.io"
+    }
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "preversion": "sed -i -e \"s/^our \\$VERSION = .*/our \\$VERSION = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/Theke/GOBI.pm; git add -u; rm -f Koha/Plugin/Com/Theke/GOBI.pm-e",
+    "build": "gulp build",
+    "test": "prove -v -r -s t/",
+    "test:load": "prove -v t/00-load.t",
+    "test:unit": "prove -v t/01-plugin-methods.t",
+    "lint": "echo 'Linting not configured yet'",
+    "clean": "rm -f *.kpz && rm -rf dist/",
+    "kpz": "echo -n ${npm_package_name}-v${npm_package_version}.kpz",
+    "print-name": "echo -n ${npm_package_name}",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "release": "npm run clean && npm run build && echo 'Release built successfully'",
+    "dev": "gulp build && echo 'Development build complete'"
+  },
+  "devDependencies": {
+    "gulp": "^5.0.0",
+    "gulp-cli": "^3.0.0"
+  },
   "dependencies": {
-    "node-datetime": "^2.0.0"
+    "node-datetime": "^2.1.2"
+  },
+  "files": [
+    "Koha/",
+    "tools/",
+    "sample_data/",
+    "README.md",
+    "LICENSE",
+    "gulpfile.js"
+  ],
+  "directories": {
+    "test": "t"
+  },
+  "main": "Koha/Plugin/Com/Theke/GOBI.pm",
+  "funding": {
+    "type": "custom",
+    "url": "https://theke.io/support"
   }
 }
