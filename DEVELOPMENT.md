@@ -1,4 +1,4 @@
-# Technical Reference for AI Assistant
+# Technical Reference
 
 ## Document Purpose
 This document serves as a technical reference for AI assistants working on the Koha GOBI plugin. It contains essential information about the plugin's architecture, build system, and development workflow.
