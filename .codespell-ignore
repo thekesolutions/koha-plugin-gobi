@@ -1,0 +1,27 @@
+# Codespell ignore file for GOBI plugin
+# Add words that should be ignored by the spell checker
+
+# Technical terms and proper nouns
+GOBI
+API
+OAuth
+JSON
+YAML
+KTD
+Koha
+ByWater
+ByWaterSolutions
+BibLibre
+OpenFifth
+Theke
+
+# GOBI specific terms
+EDI
+EDIFACT
+MARC
+
+# Common abbreviations
+config
+configs
+plugin
+plugins
