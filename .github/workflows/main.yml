@@ -54,6 +54,8 @@ jobs:
         export LOCAL_USER_ID=$(id -u)
         export KTD_HOME=$(pwd)
         export KOHA_IMAGE=${{ steps.koha-version.outputs.current-branch-name }}
+        # Remove trailing .x from branch name for Docker image tag
+        export KOHA_IMAGE=${KOHA_IMAGE%.x}
         ktd --name gobitest --plugins up -d
 
     - name: Wait for KTD to be ready
