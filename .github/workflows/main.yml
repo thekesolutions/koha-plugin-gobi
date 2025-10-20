@@ -53,6 +53,7 @@ jobs:
         cd ../koha-testing-docker
         export LOCAL_USER_ID=$(id -u)
         export KTD_HOME=$(pwd)
+        export KOHA_IMAGE=${{ steps.koha-version.outputs.current-branch-name }}
         ktd --name gobitest --plugins up -d
 
     - name: Wait for KTD to be ready
