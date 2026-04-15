@@ -5,6 +5,21 @@ All notable changes to the Koha GOBI plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.6] - 2026-04-15
+
+### Added
+- Keepalive workflow to prevent GitHub Actions from being disabled due to inactivity
+
+### Changed
+- Increased KTD `--wait-ready` timeout from 120 to 240 seconds in CI
+
+## [3.1.5] - 2026-04-15
+
+### Fixed
+- LocalData fields now matched by Description instead of array index position,
+  fixing Managing Library (LocalData4) being mapped to Internal Note when
+  LocalData3 is empty ([#6](https://github.com/thekesolutions/koha-plugin-gobi/issues/6))
+
 ## [3.1.4] - 2025-08-19
 
 ### Added
