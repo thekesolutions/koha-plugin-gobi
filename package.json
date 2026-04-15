@@ -1,6 +1,6 @@
 {
   "name": "koha-plugin-gobi",
-  "version": "3.1.5",
+  "version": "3.1.6",
   "description": "Koha GOBI plugin for automated acquisitions workflow",
   "keywords": [
     "koha",
