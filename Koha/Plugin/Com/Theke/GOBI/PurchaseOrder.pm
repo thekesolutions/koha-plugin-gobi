@@ -98,22 +98,15 @@ sub _read_xml {
     $result->{CustomerDetail} = _read_customer_detail($xml);
     $result->{OrderDetail}    = _read_order_detail($xml);
     $result->{item_po_number} = $result->{OrderDetail}->{ItemPONumber};
-    $result->{item_type} =
-        ( @{ $result->{OrderDetail}->{LocalData} }[0] )
-        ? %{ @{ $result->{OrderDetail}->{LocalData} }[0] }{value}
-        : '';
-    $result->{shelving_location} =
-        ( @{ $result->{OrderDetail}->{LocalData} }[1] )
-        ? %{ @{ $result->{OrderDetail}->{LocalData} }[1] }{value}
-        : '';
-    $result->{selector_notes} =
-        ( @{ $result->{OrderDetail}->{LocalData} }[2] )
-        ? %{ @{ $result->{OrderDetail}->{LocalData} }[2] }{value}
-        : '';
-    $result->{managing_library_id} =
-        ( @{ $result->{OrderDetail}->{LocalData} }[3] )
-        ? %{ @{ $result->{OrderDetail}->{LocalData} }[3] }{value}
-        : '';
+    my %local_data_map;
+    for my $ld ( @{ $result->{OrderDetail}->{LocalData} // [] } ) {
+        $local_data_map{ $ld->{description} } = $ld->{value};
+    }
+
+    $result->{item_type}           = $local_data_map{LocalData1} // '';
+    $result->{shelving_location}   = $local_data_map{LocalData2} // '';
+    $result->{selector_notes}      = $local_data_map{LocalData3} // '';
+    $result->{managing_library_id} = $local_data_map{LocalData4} // '';
 
     if (   $result->{type} eq 'ListedElectronicMonograph'
         or $result->{type} eq 'ListedElectronicSerial' )
