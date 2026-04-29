@@ -146,6 +146,23 @@
                 <span class="input-group-addon" id="marc_mod_template">MARC modification template to apply</span>
                 <input type="text" class="form-control" aria-describedby="marc_mod_template" name="marc_mod_template" id="marc_mod_template" value="[% marc_mod_template | html %]" />
             </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="matcher_id_label">Record matching rule</span>
+                <select class="form-control" aria-describedby="matcher_id_label" name="matcher_id" id="matcher_id">
+                  <option value="">None (always create new record)</option>
+                  [% FOREACH m IN matchers %]
+                    <option value="[% m.matcher_id | html %]" [% IF matcher_id == m.matcher_id %]selected[% END %]>[% m.code | html %] - [% m.description | html %]</option>
+                  [% END %]
+                </select>
+            </div>
+            <div class="input-group" style="width: 440px;">
+                <span class="input-group-addon" id="match_action_label">When a match is found</span>
+                <select class="form-control" aria-describedby="match_action_label" name="match_action" id="match_action">
+                  <option value="create" [% IF match_action == 'create' %]selected[% END %]>Always create a new record</option>
+                  <option value="overlay" [% IF match_action == 'overlay' %]selected[% END %]>Overlay the matched record</option>
+                  <option value="use_existing" [% IF match_action == 'use_existing' %]selected[% END %]>Use existing record (keep untouched)</option>
+                </select>
+            </div>
             <br/>
             <button type="submit" value="Save" class="btn btn-default" type="button">Save</button>
       </form>

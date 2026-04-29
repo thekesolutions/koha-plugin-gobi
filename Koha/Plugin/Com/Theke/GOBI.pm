@@ -24,7 +24,7 @@ use base qw(Koha::Plugins::Base);
 
 use C4::Acquisition qw(ModBasket NewBasket);
 use C4::Auth;
-use C4::Biblio qw(AddBiblio);
+use C4::Biblio qw(AddBiblio ModBiblio);
 use C4::Context;
 use C4::Installer;
 use C4::Items;
@@ -276,7 +276,11 @@ sub add_order {
             $gobi_order_id = $self->_store_gobi_order( $gobi_order, $basket_id, $raw_gobi_order );
 
             # Add biblio
-            ( $biblionumber, $biblioitemnumber ) = $self->_add_biblio($gobi_order);
+            my $record_action;
+            ( $biblionumber, $biblioitemnumber, $record_action ) = $self->_add_biblio($gobi_order);
+
+            # Update the GOBI order record with biblio info
+            $self->_update_gobi_order_biblio( $gobi_order_id, $biblionumber, $record_action );
 
             my $order_data = {
                 biblionumber               => $biblionumber,
@@ -408,6 +412,21 @@ sub _update_order_status {
     return $self;
 }
 
+sub _update_gobi_order_biblio {
+    my ( $self, $gpo_id, $biblionumber, $record_action ) = @_;
+
+    my $table = $self->get_qualified_table_name('purchase_orders');
+    my $sth   = C4::Context->dbh->prepare( "
+        UPDATE $table
+        SET biblionumber=?, record_action=?
+        WHERE id=?
+    " );
+
+    $sth->execute( $biblionumber, $record_action, $gpo_id );
+
+    return $self;
+}
+
 sub _get_gobi_order {
     my ( $self, $id ) = @_;
     my $table = $self->get_qualified_table_name('purchase_orders');
@@ -445,17 +464,62 @@ sub _add_biblio {
     }
 
     if ($field_942) {
-
-        # existing fields, auto-vivifies subfield if doesn't exist
-        # https://metacpan.org/pod/MARC::Field#update()
         $field_942->update(@subfields);
     } else {
-
-        # new field
         $field_942 = MARC::Field->new( '942', ' ', ' ', @subfields );
         $record->insert_fields_ordered($field_942);
     }
 
+    # Check for matching records
+    my $matcher_id    = $self->retrieve_data('matcher_id');
+    my $match_action  = $self->retrieve_data('match_action') // 'create';
+    my $record_action = 'created';
+
+    if ( $matcher_id && $match_action ne 'create' ) {
+        my $matcher = C4::Matcher->fetch($matcher_id);
+
+        if ($matcher) {
+            my @matches = $matcher->get_matches( $record, 1000 );
+
+            if (@matches) {
+                my $matched_biblionumber = $matches[0]->{record_id};
+
+                if ( @matches > 1 ) {
+                    $self->gobi_warn(
+                        sprintf( "Multiple matches (%d) found for incoming record, using biblionumber %d",
+                            scalar @matches, $matched_biblionumber )
+                    );
+                }
+
+                my $biblio = Koha::Biblios->find($matched_biblionumber);
+
+                if ($biblio) {
+                    if ( $match_action eq 'overlay' ) {
+                        my $marc_mod_template_id = $self->retrieve_data('marc_mod_template');
+                        if ($marc_mod_template_id) {
+                            try {
+                                ModifyRecordWithTemplate( $marc_mod_template_id, $record );
+                            } catch {
+                                $self->gobi_warn(
+                                    sprintf( "Error applying ModifyRecordWithTemplate(%s): %s",
+                                        $marc_mod_template_id, $_ )
+                                );
+                            };
+                        }
+                        ModBiblio( $record, $matched_biblionumber, '', { skip_record_index => 1 } );
+                        $record_action = 'overlayed';
+                    } else {
+                        # use_existing: keep record untouched
+                        $record_action = 'reused';
+                    }
+
+                    return ( $matched_biblionumber, $biblio->biblioitem->biblioitemnumber, $record_action );
+                }
+            }
+        }
+    }
+
+    # No match or match_action is 'create': add new record
     my $marc_mod_template_id = $self->retrieve_data('marc_mod_template');
 
     if ($marc_mod_template_id) {
@@ -469,7 +533,7 @@ sub _add_biblio {
 
     my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, '', { skip_record_index => 1 } );
 
-    return ( $biblionumber, $biblioitemnumber );
+    return ( $biblionumber, $biblioitemnumber, $record_action );
 }
 
 sub _generate_item_data {
@@ -560,6 +624,11 @@ sub configure {
     my $marc_mod_template                    = $self->retrieve_data('marc_mod_template');
     my $create_item_for_electronic_resources = $self->retrieve_data('create_item_for_electronic_resources');
     my $add_nonpublic_item_notes             = $self->retrieve_data('add_nonpublic_item_notes');
+    my $matcher_id                           = $self->retrieve_data('matcher_id');
+    my $match_action                         = $self->retrieve_data('match_action') // 'create';
+
+    # Fetch available matching rules for the dropdown
+    my @matchers = C4::Matcher::GetMatcherList();
 
     $template->param(
         api_key                              => $api_key,
@@ -581,6 +650,9 @@ sub configure {
         create_item_for_electronic_resources => $create_item_for_electronic_resources,
         add_nonpublic_item_notes             => $add_nonpublic_item_notes,
         marc_mod_template                    => $marc_mod_template,
+        matcher_id                           => $matcher_id,
+        match_action                         => $match_action,
+        matchers                             => \@matchers,
     );
 
     $self->output_html( $template->output() );
@@ -610,6 +682,8 @@ sub _configure {
     my $marc_mod_template                    = $cgi->param('marc_mod_template')                    // q{};
     my $create_item_for_electronic_resources = $cgi->param('create_item_for_electronic_resources') // 0;
     my $add_nonpublic_item_notes             = $cgi->param('add_nonpublic_item_notes')             // 0;
+    my $matcher_id                           = $cgi->param('matcher_id')                           // q{};
+    my $match_action                         = $cgi->param('match_action')                         // 'create';
 
     # Store new API key
     $self->store_data( { 'api_key'                              => $api_key } );
@@ -631,6 +705,8 @@ sub _configure {
     $self->store_data( { 'create_item_for_electronic_resources' => $create_item_for_electronic_resources } );
     $self->store_data( { 'add_nonpublic_item_notes'             => $add_nonpublic_item_notes } );
     $self->store_data( { marc_mod_template                      => $marc_mod_template } );
+    $self->store_data( { 'matcher_id'                           => $matcher_id } );
+    $self->store_data( { 'match_action'                         => $match_action } );
 
     $self->_list_orders();
 }
@@ -713,6 +789,24 @@ sub upgrade {
         $self->store_data( { 'add_nonpublic_item_notes' => 0 } );
 
         $self->store_data( { '__INSTALLED_VERSION__' => "2.0.2" } );
+    }
+
+    if ( $self->_version_compare( $database_version, "4.0.0" ) == -1 ) {
+
+        my $po_table = $self->get_qualified_table_name('purchase_orders');
+
+        C4::Context->dbh->do(
+            qq{
+            ALTER TABLE $po_table
+                ADD COLUMN `biblionumber` INT(11) DEFAULT NULL AFTER `basketno`,
+                ADD COLUMN `record_action` ENUM('created','overlayed','reused') DEFAULT NULL AFTER `biblionumber`;
+        }
+        );
+
+        # Default to current behavior
+        $self->store_data( { 'match_action' => 'create' } );
+
+        $self->store_data( { '__INSTALLED_VERSION__' => "4.0.0" } );
     }
 
     return 1;
