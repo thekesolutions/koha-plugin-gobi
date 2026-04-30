@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Checkout plugin code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Get Koha Version Branch Name
       id: koha-version
@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Parse out and store the GitHub repository name
       id: myvars
@@ -138,7 +138,7 @@ jobs:
       run: echo "$GITHUB_CONTEXT"
 
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: '22'
         cache: 'npm'
