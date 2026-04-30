@@ -5,6 +5,22 @@ All notable changes to the Koha GOBI plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-04-30
+
+### Added
+- Record matching and overlay/reuse support using Koha's C4::Matcher
+- New configuration options: record matching rule and match action (create/overlay/use_existing)
+- Audit trail: purchase_orders table extended with biblionumber and record_action columns
+- Admin page with API-driven orders table (pagination, sorting, filtering)
+- REST API endpoints: GET /orders, GET /orders/filters, GET /orders/{id}/marc_preview
+- MARC preview modal with side-by-side comparison of incoming vs catalog record
+- DBIC schema and Koha::Object classes for purchase_orders table
+
+### Changed
+- tool() now delegates to admin() page
+- Configure page updated to Bootstrap layout with navigation sidebar
+- Breadcrumbs follow standard Koha pattern (Tools > Plugins > GOBI)
+
 ## [3.1.6] - 2026-04-15
 
 ### Added

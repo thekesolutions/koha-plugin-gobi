@@ -35,3 +35,4 @@ inc/
 /*.zip
 /node_modules
 .vstags
+quote_overlay_feature.txt

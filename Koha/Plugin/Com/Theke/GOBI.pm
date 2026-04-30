@@ -22,6 +22,21 @@ use utf8;
 
 use base qw(Koha::Plugins::Base);
 
+use Module::Metadata;
+use Koha::Schema;
+
+BEGIN {
+    my $path = Module::Metadata->find_module_by_name(__PACKAGE__);
+    $path =~ s!\.pm$!/lib!;
+    unshift @INC, $path;
+
+    require Koha::Schema::Result::KohaPluginComThekeGobiPurchaseOrder;
+    Koha::Schema->register_class(
+        KohaPluginComThekeGobiPurchaseOrder =>
+            'Koha::Schema::Result::KohaPluginComThekeGobiPurchaseOrder'
+    );
+}
+
 use C4::Acquisition qw(ModBasket NewBasket);
 use C4::Auth;
 use C4::Biblio qw(AddBiblio ModBiblio);
@@ -86,19 +101,28 @@ sub tool {
 
     my $step = $cgi->param('step') // 'list';
 
-    if ( $step eq 'list' ) {
-        $self->_list_orders();
-    } elsif ( $step eq 'add' ) {
-        $self->_add_order();
-    } elsif ( $step eq 'get' ) {
-        $self->_get_order();
-    } elsif ( $step eq 'configure' ) {
+    if ( $step eq 'configure' ) {
         $self->_configure();
     } else {
-
-        # $step eq 'render'
-        $self->_list_orders();
+        # Redirect to admin page for all other steps
+        $self->admin($args);
     }
+}
+
+=head3 admin
+
+Renders the admin page with the API-driven orders table.
+
+=cut
+
+sub admin {
+    my ( $self, $args ) = @_;
+    my $cgi = $self->{'cgi'};
+
+    my $template = $self->get_template( { file => 'templates/admin.tt' } );
+
+    print $cgi->header( -type => 'text/html', -charset => 'UTF-8' );
+    print $template->output();
 }
 
 =head2 response_sucess

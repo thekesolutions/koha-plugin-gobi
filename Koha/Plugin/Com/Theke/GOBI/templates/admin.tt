@@ -1,0 +1,179 @@
+[% USE raw %]
+[% PROCESS 'i18n.inc' %]
+[% INCLUDE 'doc-head-open.inc' %]
+<title>GOBI - Orders &rsaquo; Plugins &rsaquo; Koha</title>
+[% INCLUDE 'doc-head-close.inc' %]
+</head>
+
+<body id="plugins_run_tool" class="plugins">
+[% WRAPPER 'header.inc' %]
+    [% INCLUDE 'cat-search.inc' %]
+[% END %]
+
+[% WRAPPER 'sub-header.inc' %]
+    [% WRAPPER breadcrumbs %]
+        [% WRAPPER breadcrumb_item %]
+            <a href="/cgi-bin/koha/tools/tools-home.pl">Tools</a>
+        [% END %]
+        [% WRAPPER breadcrumb_item %]
+            <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a>
+        [% END %]
+        [% WRAPPER breadcrumb_item bc_active=1 %]
+            GOBI
+        [% END %]
+    [% END %]
+[% END %]
+
+<div class="main container-fluid">
+    <div class="row">
+        <div class="col-md-10 order-md-2 order-sm-1">
+            <main>
+
+<h1>GOBI - Purchase orders</h1>
+
+<div class="row" style="margin-bottom: 1em;">
+    <div class="col-md-6">
+        <a class="btn btn-default" href="/cgi-bin/koha/plugins/run.pl?class=Koha%3A%3APlugin%3A%3ACom%3A%3ATheke%3A%3AGOBI&method=configure">
+            <i class="fa fa-cog"></i> Configuration
+        </a>
+    </div>
+</div>
+
+<div class="page-section">
+    <table id="gobi_orders_table" class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Basket</th>
+                <th>Biblio</th>
+                <th>Record action</th>
+                <th>Date</th>
+                <th>MARC</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+
+<!-- MARC Preview Modal -->
+<div class="modal" id="marcPreviewModal" tabindex="-1" role="dialog" aria-labelledby="marcPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title" id="marcPreviewModalLabel">MARC record preview</h1>
+            </div>
+            <div class="modal-body" id="marcPreviewContent"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% INCLUDE 'datatables.inc' %]
+[% INCLUDE 'js-date-format.inc' %]
+<script>
+    $(document).ready(function() {
+        var order_filters = { statuses: [], record_actions: [] };
+        $.ajax({
+            url: "/api/v1/contrib/gobi/orders/filters",
+            dataType: "json",
+            async: false,
+            success: function(data) { order_filters = data; }
+        });
+
+        var orders_table = $("#gobi_orders_table").kohaTable({
+            ajax: { url: "/api/v1/contrib/gobi/orders" },
+            order: [[0, "desc"]],
+            columns: [
+                { data: "gobi_order_id", searchable: true, orderable: true },
+                {
+                    data: "status", searchable: true, orderable: true, dataFilter: "statuses",
+                    render: function(data) {
+                        var colors = { processed: "background:#2ecc40;color:#fff", error: "background:#e74c3c;color:#fff" };
+                        return '<span class="badge" style="' + (colors[data] || "background:#999;color:#fff") + '">' + (data || '') + '</span>';
+                    }
+                },
+                {
+                    data: "basket_id", searchable: true, orderable: true,
+                    render: function(data) {
+                        if (!data) return "";
+                        return '<a href="/cgi-bin/koha/acqui/basket.pl?basketno=' + data + '">' + data + '</a>';
+                    }
+                },
+                {
+                    data: "biblio_id", searchable: true, orderable: true,
+                    render: function(data) {
+                        if (!data) return "";
+                        return '<a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber=' + data + '">' + data + '</a>';
+                    }
+                },
+                {
+                    data: "record_action", searchable: true, orderable: true, dataFilter: "record_actions",
+                    render: function(data) {
+                        if (!data) return "";
+                        var colors = { created: "background:#3498db;color:#fff", overlayed: "background:#f39c12;color:#fff", reused: "background:#2ecc40;color:#fff" };
+                        return '<span class="badge" style="' + (colors[data] || "background:#999;color:#fff") + '">' + data + '</span>';
+                    }
+                },
+                {
+                    data: "timestamp", searchable: false, orderable: true,
+                    render: function(data) { return data ? $datetime(data) : ""; }
+                },
+                {
+                    data: "gobi_order_id", searchable: false, orderable: false,
+                    render: function(data) {
+                        return '<a href="#" class="view-marc" data-id="' + data + '">View MARC</a>';
+                    }
+                }
+            ]
+        }, null, 1, null, {
+            statuses: function() { return order_filters.statuses.map(function(v) { return { _id: v, _str: v }; }); },
+            record_actions: function() { return order_filters.record_actions.map(function(v) { return { _id: v, _str: v }; }); }
+        });
+
+        $(document).on("click", ".view-marc", function(e) {
+            e.preventDefault();
+            var id = $(this).data("id");
+            $("#marcPreviewContent").html('<p>Loading...</p>');
+            $("#marcPreviewModal").modal("show");
+            $.ajax({
+                url: "/api/v1/contrib/gobi/orders/" + id + "/marc_preview",
+                dataType: "json",
+                success: function(data) {
+                    var html = '<div class="row">';
+                    html += '<div class="col-md-' + (data.catalog_marc ? '6' : '12') + '">';
+                    html += '<h4>Incoming MARC (from GOBI)</h4>';
+                    html += '<pre style="white-space:pre-wrap;font-size:12px;max-height:500px;overflow:auto">' + (data.incoming_marc || 'Not available').escapeHtml() + '</pre>';
+                    html += '</div>';
+                    if (data.catalog_marc) {
+                        html += '<div class="col-md-6">';
+                        html += '<h4>Catalog record (biblio ' + data.biblio_id + ')</h4>';
+                        html += '<pre style="white-space:pre-wrap;font-size:12px;max-height:500px;overflow:auto">' + data.catalog_marc.escapeHtml() + '</pre>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                    if (data.record_action) {
+                        html += '<p><strong>Action taken:</strong> ' + data.record_action + '</p>';
+                    }
+                    $("#marcPreviewContent").html(html);
+                },
+                error: function() {
+                    $("#marcPreviewContent").html('<p class="alert alert-danger">Failed to load MARC preview</p>');
+                }
+            });
+        });
+    });
+</script>
+
+            </main>
+        </div>
+        <div class="col-md-2 order-sm-2 order-md-1">
+            <aside>
+                [% INCLUDE 'tools-menu.inc' %]
+            </aside>
+        </div>
+    </div>
+
+    [% INCLUDE 'intranet-bottom.inc' %]
+</div>
