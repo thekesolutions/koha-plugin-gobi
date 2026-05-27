@@ -767,6 +767,8 @@ sub install {
           `id` INT(11) NOT NULL auto_increment,
           `status` TEXT,
           `basketno` INT(11) REFERENCES aqbasket( basketno),
+          `biblionumber` INT(11) DEFAULT NULL,
+          `record_action` ENUM('created','overlayed','reused') DEFAULT NULL,
           `raw_msg` MEDIUMTEXT,
           `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY  (id),
