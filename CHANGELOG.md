@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite for record matching rules (ISBN and OCLC) in t/02-matching-rules.t
 - End-user documentation for configuring ISBN/OCLC matching rules in README
 
+### Fixed
+- Configuration save now shows success message instead of blank page ([#7](https://github.com/thekesolutions/koha-plugin-gobi/issues/7))
+- Fresh install missing `biblionumber` and `record_action` columns ([#8](https://github.com/thekesolutions/koha-plugin-gobi/issues/8))
+
 ## [4.0.0] - 2026-04-30
 
 ### Added

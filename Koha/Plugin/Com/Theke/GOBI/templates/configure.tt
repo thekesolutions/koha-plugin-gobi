@@ -52,6 +52,10 @@
         <div class="col-md-10 order-md-2 order-sm-1">
             <h1>GOBI configuration</h1>
 
+      [% IF saved %]
+      <div class="alert alert-success" role="alert">Configuration saved successfully.</div>
+      [% END %]
+
       <br>
 
       <form method="post">

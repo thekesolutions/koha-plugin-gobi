@@ -354,56 +354,6 @@ sub add_order {
     return $koha_order->ordernumber;
 }
 
-sub _get_order {
-    my ( $self, $args ) = @_;
-
-    my $cgi = $self->{cgi};
-    my $id  = $cgi->param('gobi_order_id');
-
-    my $template = $self->get_template( { file => 'templates/order_details.tt' } );
-
-    my $gobi_order;
-
-    try {
-        $gobi_order = $self->_get_gobi_order($id);
-    } catch {
-        if ( $_->isa('Koha::Plugin::Com::Theke::GOBI::Exception') ) {
-            $template->param( error => $_->error );
-        } else {
-            $template->param( error => $_ );
-        }
-    };
-
-    $template->param(
-        gobi_order => $gobi_order,
-        gpo_id     => $id
-    );
-
-    $self->output_html( $template->output() );
-}
-
-sub _list_orders {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{cgi};
-
-    my $template = $self->get_template( { file => 'templates/main.tt' } );
-
-    # Fetch from DB marching a criteria
-    my $table = $self->get_qualified_table_name('purchase_orders');
-    my $sth   = C4::Context->dbh->prepare( "
-        SELECT * FROM $table
-    " );
-
-    $sth->execute();
-    my $gobi_orders = $sth->fetchall_arrayref( {} );
-
-    $template->param(
-        gobi_orders => $gobi_orders,
-    );
-
-    $self->output_html( $template->output() );
-}
-
 sub _store_gobi_order {
     my ( $self, $gobi_order, $basketno, $raw ) = @_;
 
@@ -627,6 +577,8 @@ sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{cgi};
 
+    my $saved = $args->{saved} // 0;
+
     my $template = $self->get_template( { file => 'templates/configure.tt' } );
 
     my $api_key                              = $self->retrieve_data('api_key');
@@ -677,6 +629,7 @@ sub configure {
         matcher_id                           => $matcher_id,
         match_action                         => $match_action,
         matchers                             => \@matchers,
+        saved                                => $saved,
     );
 
     $self->output_html( $template->output() );
@@ -732,7 +685,7 @@ sub _configure {
     $self->store_data( { 'matcher_id'                           => $matcher_id } );
     $self->store_data( { 'match_action'                         => $match_action } );
 
-    $self->_list_orders();
+    $self->configure( { saved => 1 } );
 }
 
 sub order_type_to_sort_value {
