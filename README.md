@@ -68,6 +68,57 @@ Provide your GOBI representative with:
 ### Currency Requirements
 GOBI supports **USD** and **GBP** currency codes. Ensure these are configured in Koha.
 
+### Record Matching Rules (ISBN / OCLC)
+
+The plugin can detect duplicate records before creating new ones. When a GOBI order arrives, the incoming MARC record is compared against your catalog using Koha's matching rules. This avoids creating duplicate bibliographic records for titles you already own.
+
+#### Setting up a matching rule in Koha
+
+1. Go to **Administration → Record matching rules**
+2. Click **New record matching rule**
+3. Fill in:
+   - **Matching rule code**: e.g. `ISBN` or `OCLC`
+   - **Description**: e.g. "Match on ISBN" or "Match on OCLC number"
+   - **Match threshold**: `1000`
+4. Add a **match point**:
+
+   | Field | For ISBN matching | For OCLC matching |
+   |-------|-------------------|-------------------|
+   | Search index | `isbn` | `Other-control-number` |
+   | Score | `1000` | `1000` |
+   | Tag | `020` | `035` |
+   | Subfields | `a` | `a` |
+
+5. Save the matching rule
+
+#### Configuring the plugin to use matching
+
+1. Go to the **GOBI plugin configuration** page
+2. In the **Record matching rule** dropdown, select the rule you created
+3. Choose the **Match action**:
+   - **Create new record** — ignore matches, always create a new biblio (default)
+   - **Overlay existing record** — replace the matched record with the incoming GOBI record
+   - **Use existing record** — keep the existing record untouched and attach the order to it
+4. Save configuration
+
+#### How it works
+
+When a GOBI order is received:
+
+1. The plugin extracts the MARC record from the order
+2. If a matching rule is configured, it searches for existing records using the configured index (ISBN or OCLC number)
+3. If a match is found:
+   - **Overlay**: the existing record is updated with the incoming data, and the order is linked to it
+   - **Use existing**: the order is linked to the existing record without modifying it
+4. If no match is found, a new bibliographic record is created
+
+#### Tips
+
+- **ISBN matching** works best for print monographs where the ISBN in the GOBI record matches your catalog
+- **OCLC matching** is useful when your records have 035$a fields with `(OCoLC)` prefixes — this is common for records sourced from WorldCat
+- You can only configure one matching rule at a time
+- If multiple matches are found, the plugin uses the first (highest-scoring) match and logs a warning
+
 ## Testing
 
 Test the API endpoint:
