@@ -47,7 +47,7 @@
                 <th>Order key</th>
                 <th>Status</th>
                 <th>Basket</th>
-                <th>Biblio</th>
+                <th>Title / Author</th>
                 <th>Record action</th>
                 <th>Date</th>
                 <th>MARC</th>
@@ -102,7 +102,7 @@
             ajax: {
                 url: "/api/v1/contrib/gobi/orders"
             },
-            embed: ["basket"],
+            embed: ["basket", "biblio"],
             order: [[0, "desc"]],
             columns: [
                 {
@@ -134,10 +134,14 @@
                     }
                 },
                 {
-                    data: "biblio_id", searchable: true, orderable: true,
-                    render: function(data) {
-                        if (!data) return "";
-                        return '<a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber=' + data + '">' + data + '</a>';
+                    data: "biblio.title", searchable: true, orderable: true,
+                    render: function(data, type, row) {
+                        if (!row.biblio_id) return "";
+                        var title = row.biblio ? row.biblio.title : row.biblio_id;
+                        var author = row.biblio ? row.biblio.author : "";
+                        var display = (title || "").escapeHtml();
+                        if (author) display += ' <span class="text-muted">/ ' + author.escapeHtml() + '</span>';
+                        return '<a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber=' + row.biblio_id + '">' + display + '</a>';
                     }
                 },
                 {

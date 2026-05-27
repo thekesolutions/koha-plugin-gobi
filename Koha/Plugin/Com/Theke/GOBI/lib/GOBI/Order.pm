@@ -20,6 +20,7 @@ package GOBI::Order;
 use Modern::Perl;
 
 use Koha::Acquisition::Baskets;
+use Koha::Biblios;
 
 use base qw(Koha::Object);
 
@@ -57,6 +58,16 @@ sub to_api_mapping {
 sub basket {
     my ($self) = @_;
     return Koha::Acquisition::Basket->_new_from_dbic( scalar $self->_result->basket );
+}
+
+=head3 biblio
+
+=cut
+
+sub biblio {
+    my ($self) = @_;
+    my $biblio_rs = $self->_result->biblio or return;
+    return Koha::Biblio->_new_from_dbic($biblio_rs);
 }
 
 1;

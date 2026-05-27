@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Raw XML purchase order viewer in admin page ([#9](https://github.com/thekesolutions/koha-plugin-gobi/issues/9))
 - Searchable `order_key` column (YBPOrderKey) in orders table, links to XML modal ([#10](https://github.com/thekesolutions/koha-plugin-gobi/issues/10))
 - Basket column displays basket name via embedded object ([#11](https://github.com/thekesolutions/koha-plugin-gobi/issues/11))
+- Biblio column displays title and author via embedded object ([#12](https://github.com/thekesolutions/koha-plugin-gobi/issues/12))
 
 ## [4.0.1] - 2026-05-27
 

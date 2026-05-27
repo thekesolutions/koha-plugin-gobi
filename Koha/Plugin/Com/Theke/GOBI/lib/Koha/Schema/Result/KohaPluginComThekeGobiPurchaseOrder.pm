@@ -24,4 +24,11 @@ __PACKAGE__->belongs_to(
     { join_type          => 'LEFT' },
 );
 
+__PACKAGE__->belongs_to(
+    'biblio',
+    'Koha::Schema::Result::Biblio',
+    { 'foreign.biblionumber' => 'self.biblionumber' },
+    { join_type             => 'LEFT' },
+);
+
 1;
