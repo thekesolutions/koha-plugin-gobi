@@ -102,6 +102,9 @@ sub marc_preview {
 
         my $result = { gobi_order_id => $id, record_action => $order->record_action };
 
+        # Include raw XML
+        $result->{raw_xml} = $order->raw_msg if $order->raw_msg;
+
         # Parse incoming MARC from raw XML
         if ( $order->raw_msg ) {
             require MARC::Record;
