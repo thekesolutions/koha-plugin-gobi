@@ -360,11 +360,11 @@ sub _store_gobi_order {
     my $table = $self->get_qualified_table_name('purchase_orders');
     my $sth   = C4::Context->dbh->prepare( "
         INSERT INTO $table
-               ( status, basketno, raw_msg )
-        VALUES ( ?,      ?,        ? )
+               ( status, basketno, order_key, raw_msg )
+        VALUES ( ?,      ?,        ?,         ? )
     " );
 
-    $sth->execute( 'processed', $basketno, $raw );
+    $sth->execute( 'processed', $basketno, $gobi_order->OrderDetail->{YBPOrderKey}, $raw );
 
     my $gpo_id = C4::Context->dbh->{'mysql_insertid'};
 
@@ -722,6 +722,7 @@ sub install {
           `basketno` INT(11) REFERENCES aqbasket( basketno),
           `biblionumber` INT(11) DEFAULT NULL,
           `record_action` ENUM('created','overlayed','reused') DEFAULT NULL,
+          `order_key` VARCHAR(255) DEFAULT NULL,
           `raw_msg` MEDIUMTEXT,
           `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY  (id),
@@ -786,6 +787,20 @@ sub upgrade {
         $self->store_data( { 'match_action' => 'create' } );
 
         $self->store_data( { '__INSTALLED_VERSION__' => "4.0.0" } );
+    }
+
+    if ( $self->_version_compare( $database_version, "4.0.1" ) == -1 ) {
+
+        my $po_table = $self->get_qualified_table_name('purchase_orders');
+
+        C4::Context->dbh->do(
+            qq{
+            ALTER TABLE $po_table
+                ADD COLUMN `order_key` VARCHAR(255) DEFAULT NULL AFTER `record_action`;
+        }
+        );
+
+        $self->store_data( { '__INSTALLED_VERSION__' => "4.0.1" } );
     }
 
     return 1;

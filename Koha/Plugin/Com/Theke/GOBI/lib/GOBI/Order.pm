@@ -44,6 +44,7 @@ sub to_api_mapping {
         id           => 'gobi_order_id',
         basketno     => 'basket_id',
         biblionumber => 'biblio_id',
+        order_key    => 'order_key',
     };
 }
 

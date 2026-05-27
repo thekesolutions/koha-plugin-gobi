@@ -10,6 +10,7 @@ __PACKAGE__->add_columns(
     'basketno',      { data_type => 'integer', is_foreign_key    => 1, is_nullable => 1 },
     'biblionumber',  { data_type => 'integer', is_nullable       => 1 },
     'record_action', { data_type => 'enum',    extra => { list => [qw(created overlayed reused)] }, is_nullable => 1 },
+    'order_key',     { data_type => 'varchar', size => 255, is_nullable => 1 },
     'raw_msg',       { data_type => 'mediumtext', is_nullable    => 1 },
     'timestamp',     { data_type => 'timestamp',  is_nullable    => 0 },
 );

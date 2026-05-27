@@ -44,13 +44,13 @@
         <thead>
             <tr>
                 <th>ID</th>
+                <th>Order key</th>
                 <th>Status</th>
                 <th>Basket</th>
                 <th>Biblio</th>
                 <th>Record action</th>
                 <th>Date</th>
                 <th>MARC</th>
-                <th>XML</th>
             </tr>
         </thead>
     </table>
@@ -102,7 +102,19 @@
             ajax: { url: "/api/v1/contrib/gobi/orders" },
             order: [[0, "desc"]],
             columns: [
-                { data: "gobi_order_id", searchable: true, orderable: true },
+                {
+                    data: "gobi_order_id", searchable: true, orderable: true, width: "50px",
+                    render: function(data) {
+                        return '<a href="#" class="view-xml" data-id="' + data + '">' + data + '</a>';
+                    }
+                },
+                {
+                    data: "order_key", searchable: true, orderable: true,
+                    render: function(data, type, row) {
+                        if (!data) return "";
+                        return '<a href="#" class="view-xml" data-id="' + row.gobi_order_id + '">' + data.escapeHtml() + '</a>';
+                    }
+                },
                 {
                     data: "status", searchable: true, orderable: true, dataFilter: "statuses",
                     render: function(data) {
@@ -140,12 +152,6 @@
                     data: "gobi_order_id", searchable: false, orderable: false,
                     render: function(data) {
                         return '<a href="#" class="view-marc" data-id="' + data + '">View MARC</a>';
-                    }
-                },
-                {
-                    data: "gobi_order_id", searchable: false, orderable: false,
-                    render: function(data) {
-                        return '<a href="#" class="view-xml" data-id="' + data + '">View XML</a>';
                     }
                 }
             ]
