@@ -99,7 +99,10 @@
         });
 
         var orders_table = $("#gobi_orders_table").kohaTable({
-            ajax: { url: "/api/v1/contrib/gobi/orders" },
+            ajax: {
+                url: "/api/v1/contrib/gobi/orders"
+            },
+            embed: ["basket"],
             order: [[0, "desc"]],
             columns: [
                 {
@@ -123,10 +126,11 @@
                     }
                 },
                 {
-                    data: "basket_id", searchable: true, orderable: true,
-                    render: function(data) {
-                        if (!data) return "";
-                        return '<a href="/cgi-bin/koha/acqui/basket.pl?basketno=' + data + '">' + data + '</a>';
+                    data: "basket.name", searchable: true, orderable: true,
+                    render: function(data, type, row) {
+                        if (!row.basket_id) return "";
+                        var name = data || row.basket_id;
+                        return '<a href="/cgi-bin/koha/acqui/basket.pl?basketno=' + row.basket_id + '">' + name.toString().escapeHtml() + '</a>';
                     }
                 },
                 {

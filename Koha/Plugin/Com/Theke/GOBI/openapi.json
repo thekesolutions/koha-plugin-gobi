@@ -28,6 +28,7 @@
       "tags": ["orders"],
       "produces": ["application/json"],
       "parameters": [
+        { "name": "x-koha-embed", "in": "header", "required": false, "description": "Embed related resources", "type": "array", "items": { "type": "string", "enum": ["basket"] }, "collectionFormat": "csv" },
         { "name": "status", "in": "query", "type": "string", "description": "Filter by status", "required": false },
         { "name": "record_action", "in": "query", "type": "string", "description": "Filter by record action", "required": false },
         { "name": "_match", "in": "query", "type": "string", "description": "Match type", "required": false },

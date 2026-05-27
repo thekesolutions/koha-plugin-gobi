@@ -19,6 +19,8 @@ package GOBI::Order;
 
 use Modern::Perl;
 
+use Koha::Acquisition::Baskets;
+
 use base qw(Koha::Object);
 
 =head1 NAME
@@ -46,6 +48,15 @@ sub to_api_mapping {
         biblionumber => 'biblio_id',
         order_key    => 'order_key',
     };
+}
+
+=head3 basket
+
+=cut
+
+sub basket {
+    my ($self) = @_;
+    return Koha::Acquisition::Basket->_new_from_dbic( scalar $self->_result->basket );
 }
 
 1;
