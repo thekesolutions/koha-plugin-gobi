@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - GOBI orders fail with 'XML error' on Koha 26.05, whose REST API converts every `application/xml` request body to JSON (Bug 37762). The `POST /orders` route now sets `x-koha-raw-payload` to opt out (Bug 43460)
+- Discount is now normalised before being used in calculations ([#14](https://github.com/thekesolutions/koha-plugin-gobi/pull/14))
 
 ### Changed
 - Updated `softprops/action-gh-release` from v2 to v3 for Node.js 24 compatibility ([#13](https://github.com/thekesolutions/koha-plugin-gobi/issues/13))
