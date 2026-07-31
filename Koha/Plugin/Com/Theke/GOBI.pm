@@ -548,10 +548,10 @@ sub _prepare_order_data {
     # Get tax and discounts info from the vendor
     my $tax_rate     = $bookseller->tax_rate;
     my $discount     = $bookseller->discount // 0;
-    my $THE_discount = $discount / 100;
+    $discount /= 100;
 
     $order_data->{tax_rate} = $tax_rate;
-    $order_data->{discount} = $THE_discount;
+    $order_data->{discount} = $discount;
 
     if ($price) {
         if ( $bookseller->listincgst ) {
