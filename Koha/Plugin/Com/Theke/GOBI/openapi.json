@@ -3,6 +3,7 @@
     "post": {
       "x-mojo-to": "Com::Theke::GOBI::Controller#add_order",
       "operationId": "add_order",
+      "x-koha-raw-payload": true,
       "tags": ["orders"],
       "parameters": [
         {
