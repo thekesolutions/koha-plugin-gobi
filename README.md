@@ -131,6 +131,10 @@ Expected response (API key missing error indicates the endpoint is working):
 <Response><Error><Code>API_KEY_MISSING</Code></Error></Response>
 ```
 
+## Further documentation
+
+- [Avoiding duplicate items when importing GOBI cataloguing records](docs/marc-import-workflow.md) — the recommended `Stage MARC records for import` configuration for the cataloguing MARC record GOBI sends after order placement.
+
 ## Notes
 
 - GOBI only accepts `<POLineNumber>` in response messages
